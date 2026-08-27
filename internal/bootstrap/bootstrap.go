@@ -5,6 +5,7 @@ import (
 	"github.com/vekio/shorty/internal/app"
 	"github.com/vekio/shorty/internal/app/createlink"
 	"github.com/vekio/shorty/internal/app/getlink"
+	"github.com/vekio/shorty/internal/app/listlinks"
 	"github.com/vekio/shorty/internal/app/ports"
 	"github.com/vekio/shorty/internal/app/visitlink"
 )
@@ -27,7 +28,8 @@ func newApplication(deps dependencies) app.Application {
 			VisitLink:  visitlink.NewVisitLinkHandler(deps.linkRepo),
 		},
 		Queries: app.Queries{
-			GetLink: getlink.NewGetLinkHandler(deps.linkRepo),
+			GetLink:   getlink.NewGetLinkHandler(deps.linkRepo),
+			ListLinks: listlinks.NewListLinksHandler(deps.linkRepo),
 		},
 	}
 }

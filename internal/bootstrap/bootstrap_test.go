@@ -5,12 +5,13 @@ import (
 
 	"github.com/vekio/shorty/internal/app/createlink"
 	"github.com/vekio/shorty/internal/app/getlink"
+	"github.com/vekio/shorty/internal/app/listlinks"
 	"github.com/vekio/shorty/internal/app/visitlink"
 )
 
 func TestNewWiresHandlersToSharedRepository(t *testing.T) {
 	application := New()
-	if application.Commands.CreateLink == nil || application.Commands.VisitLink == nil || application.Queries.GetLink == nil {
+	if application.Commands.CreateLink == nil || application.Commands.VisitLink == nil || application.Queries.GetLink == nil || application.Queries.ListLinks == nil {
 		t.Fatal("New() returned an application with nil handlers")
 	}
 
@@ -27,5 +28,12 @@ func TestNewWiresHandlersToSharedRepository(t *testing.T) {
 	}
 	if found.Code != created.Code || found.Visits != 1 {
 		t.Errorf("found = %#v, want created link with one visit", found)
+	}
+	listed, err := application.Queries.ListLinks.Handle(t.Context(), listlinks.ListLinksQuery{})
+	if err != nil {
+		t.Fatalf("list links: %v", err)
+	}
+	if len(listed.Links) != 1 || listed.Links[0].Code != created.Code {
+		t.Errorf("listed = %#v, want created link", listed)
 	}
 }

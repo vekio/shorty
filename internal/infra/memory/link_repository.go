@@ -45,6 +45,20 @@ func (repository *LinkRepository) FindByCode(ctx context.Context, code string) (
 	return link, nil
 }
 
+func (repository *LinkRepository) FindAll(ctx context.Context) ([]domain.Link, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	repository.mu.RLock()
+	defer repository.mu.RUnlock()
+	links := make([]domain.Link, 0, len(repository.links))
+	for _, link := range repository.links {
+		links = append(links, link)
+	}
+	return links, nil
+}
+
 func (repository *LinkRepository) UpdateLinkVisits(ctx context.Context, link domain.Link) error {
 	if err := ctx.Err(); err != nil {
 		return err

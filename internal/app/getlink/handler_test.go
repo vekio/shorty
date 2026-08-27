@@ -21,6 +21,9 @@ func (repository *repositoryStub) FindByCode(_ context.Context, code string) (do
 	repository.findCode = code
 	return repository.link, repository.findErr
 }
+func (*repositoryStub) FindAll(context.Context) ([]domain.Link, error) {
+	panic("FindAll must not be called by GetLink")
+}
 func (*repositoryStub) UpdateLinkVisits(context.Context, domain.Link) error {
 	panic("UpdateLinkVisits must not be called by GetLink")
 }

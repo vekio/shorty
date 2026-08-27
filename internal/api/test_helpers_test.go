@@ -10,19 +10,22 @@ import (
 	"github.com/vekio/shorty/internal/app"
 	"github.com/vekio/shorty/internal/app/createlink"
 	"github.com/vekio/shorty/internal/app/getlink"
+	"github.com/vekio/shorty/internal/app/listlinks"
 	"github.com/vekio/shorty/internal/app/visitlink"
 	"github.com/vekio/shorty/internal/infra/memory"
-	"github.com/vekio/shorty/pkg/amigo"
 )
 
-func newTestAPI() *amigo.App {
+func newTestAPI() http.Handler {
 	repository := memory.NewLinkRepository()
 	application := app.Application{
 		Commands: app.Commands{
 			CreateLink: createlink.NewCreateLinkHandler(repository),
 			VisitLink:  visitlink.NewVisitLinkHandler(repository),
 		},
-		Queries: app.Queries{GetLink: getlink.NewGetLinkHandler(repository)},
+		Queries: app.Queries{
+			GetLink:   getlink.NewGetLinkHandler(repository),
+			ListLinks: listlinks.NewListLinksHandler(repository),
+		},
 	}
 	return New(application)
 }

@@ -2,59 +2,88 @@ package amigo
 
 import (
 	"context"
-	"encoding/json/v2"
-	"fmt"
 	"net/http"
 )
 
-// Handler turns a typed request into a typed response.
-type Handler[In, Out any] func(context.Context, In) (Out, error)
+// EndpointFunc receives a typed input and returns the typed response body.
+type EndpointFunc[In, Out any] func(context.Context, In) (Out, error)
 
-func (app *App) requestHandler[In, Out any](
-	handler Handler[In, Out],
-	configuredRoute route,
+// RawEndpointFunc is the escape hatch for endpoints that need direct access to
+// net/http, such as streaming responses or file downloads.
+type RawEndpointFunc func(http.ResponseWriter, *http.Request) error
+
+func (app *Api) handler[In, Out any](
+	route route,
+	inputMetadata inputMetadata,
+	outputMetadata outputMetadata,
+	endpoint EndpointFunc[In, Out],
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, request *http.Request) {
-		app.processRequest(w, request, handler, configuredRoute)
+		limitRequestBody(w, request, route.maxBodyBytes)
+
+		input, err := bindInput[In](request, inputMetadata)
+		if err != nil {
+			writeError(w, request, route, err)
+			return
+		}
+
+		output, err := endpoint(request.Context(), input)
+		if err != nil {
+			writeError(w, request, route, err)
+			return
+		}
+
+		if err := writeOutput(w, route.status, output, outputMetadata); err != nil {
+			writeError(w, request, route, err)
+		}
 	}
 }
 
-func (app *App) processRequest[In, Out any](
-	w http.ResponseWriter,
-	request *http.Request,
-	handler Handler[In, Out],
-	configuredRoute route,
+func (app *Api) rawHandler(route route, endpoint RawEndpointFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, request *http.Request) {
+		limitRequestBody(w, request, route.maxBodyBytes)
+		if err := endpoint(w, request); err != nil {
+			writeError(w, request, route, err)
+		}
+	}
+}
+
+func limitRequestBody(w http.ResponseWriter, request *http.Request, limit int64) {
+	if limit > 0 && request.Body != nil {
+		request.Body = http.MaxBytesReader(w, request.Body, limit)
+	}
+}
+
+// GET registers a typed GET endpoint.
+func (app *Api) GET[In, Out any](path string, endpoint EndpointFunc[In, Out], options ...RouteOption) {
+	app.handle(http.MethodGet, path, endpoint, options...)
+}
+
+// POST registers a typed POST endpoint.
+func (app *Api) POST[In, Out any](path string, endpoint EndpointFunc[In, Out], options ...RouteOption) {
+	app.handle(http.MethodPost, path, endpoint, options...)
+}
+
+// RAW registers an endpoint that owns its complete net/http response.
+func (app *Api) RAW(method string, path string, endpoint RawEndpointFunc, options ...RouteOption) {
+	if endpoint == nil {
+		panic("amigo: raw endpoint cannot be nil")
+	}
+	route := newRoute(method, path, options...)
+	app.mux.HandleFunc(route.pattern(), app.rawHandler(route, endpoint))
+}
+
+func (app *Api) handle[In, Out any](
+	method string,
+	path string,
+	endpoint EndpointFunc[In, Out],
+	options ...RouteOption,
 ) {
-	input, err := bindInput[In](w, request, configuredRoute.input, app.maxBodyBytes)
-	if err != nil {
-		app.writeError(w, request, err)
-		return
+	if endpoint == nil {
+		panic("amigo: endpoint cannot be nil")
 	}
-
-	output, err := handler(request.Context(), input)
-	if err != nil {
-		app.writeError(w, request, err)
-		return
-	}
-
-	if err := writeOutput(w, configuredRoute.status, output); err != nil {
-		app.writeError(w, request, err)
-	}
-}
-
-func writeOutput[Out any](w http.ResponseWriter, status int, output Out) error {
-	if status == http.StatusNoContent || status == http.StatusResetContent {
-		w.WriteHeader(status)
-		return nil
-	}
-
-	data, err := json.Marshal(output)
-	if err != nil {
-		return fmt.Errorf("encode response: %w", err)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_, _ = w.Write(data)
-	return nil
+	route := newRoute(method, path, options...)
+	inputMetadata := buildInputMetadata[In](route.path)
+	outputMetadata := buildOutputMetadata[Out]()
+	app.mux.HandleFunc(route.pattern(), app.handler(route, inputMetadata, outputMetadata, endpoint))
 }

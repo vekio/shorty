@@ -23,7 +23,7 @@ func TestVisitLinkRegistersVisit(t *testing.T) {
 
 	getResponse := httptest.NewRecorder()
 	httpAPI.ServeHTTP(getResponse, httptest.NewRequest(http.MethodGet, "/links/"+created.Code, nil))
-	var fetched GetLinkOutput
+	var fetched LinkOutput
 	if err := json.Unmarshal(getResponse.Body.Bytes(), &fetched); err != nil {
 		t.Fatalf("decode get response: %v", err)
 	}

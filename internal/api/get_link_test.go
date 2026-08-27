@@ -17,7 +17,7 @@ func TestGetLinkBindsIDFromPath(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusOK, response.Body.String())
 	}
-	var output GetLinkOutput
+	var output LinkOutput
 	if err := json.Unmarshal(response.Body.Bytes(), &output); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}

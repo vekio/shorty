@@ -1,59 +1,102 @@
 package amigo
 
 import (
-	"reflect"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
-func TestBuildInputFindsBodyAndPathParameters(t *testing.T) {
-	type input struct {
-		ID   string `path:"id"`
-		Body struct{}
+func TestBindInputDecodesJSON(t *testing.T) {
+	type inputBody struct {
+		Name string `json:"name"`
 	}
-	metadata := buildInput(reflect.TypeFor[input](), "/things/{id}")
-	if metadata.bodyIndex != 1 || len(metadata.path) != 1 || metadata.path[0].name != "id" {
-		t.Errorf("metadata = %#v", metadata)
+	request := httptest.NewRequest(http.MethodPost, "/things", strings.NewReader(`{"name":"shorty"}`))
+	request.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	input, err := bindInput[inputBody](request, buildInputMetadata[inputBody]("/things"))
+
+	if err != nil {
+		t.Fatalf("bindInput() error = %v", err)
+	}
+	if input.Name != "shorty" {
+		t.Errorf("name = %q, want %q", input.Name, "shorty")
 	}
 }
 
-func TestBuildParametersRejectsInvalidDeclarations(t *testing.T) {
+func TestBindInputAllowsMissingBody(t *testing.T) {
+	type inputBody struct{ Name string }
+	request := httptest.NewRequest(http.MethodGet, "/things", nil)
+
+	input, err := bindInput[inputBody](request, buildInputMetadata[inputBody]("/things"))
+
+	if err != nil {
+		t.Fatalf("bindInput() error = %v", err)
+	}
+	if input.Name != "" {
+		t.Errorf("name = %q, want empty", input.Name)
+	}
+}
+
+func TestBindInputRejectsInvalidJSONRequests(t *testing.T) {
 	tests := []struct {
-		name    string
-		pattern string
-		typeOf  reflect.Type
+		name        string
+		body        string
+		contentType string
+		status      int
 	}{
-		{name: "empty tag", pattern: "/things/{id}", typeOf: reflect.TypeFor[struct {
-			ID string `path:""`
-		}]()},
-		{name: "missing wildcard", pattern: "/things", typeOf: reflect.TypeFor[struct {
-			ID string `path:"id"`
-		}]()},
-		{name: "unbound wildcard", pattern: "/things/{id}", typeOf: reflect.TypeFor[struct{ ID string }]()},
-		{name: "duplicate binding", pattern: "/things/{id}", typeOf: reflect.TypeFor[struct {
-			ID   string `path:"id"`
-			Code string `path:"id"`
-		}]()},
-		{name: "unsupported type", pattern: "/things/{id}", typeOf: reflect.TypeFor[struct {
-			ID []string `path:"id"`
-		}]()},
+		{name: "missing content type", body: `{}`, status: http.StatusUnsupportedMediaType},
+		{name: "wrong content type", body: `{}`, contentType: "text/plain", status: http.StatusUnsupportedMediaType},
+		{name: "malformed JSON", body: `{"name":`, contentType: "application/json", status: http.StatusBadRequest},
+		{name: "unknown member", body: `{"unknown":true}`, contentType: "application/json", status: http.StatusBadRequest},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assertPanics(t, func() { buildInput(test.typeOf, test.pattern) })
+			type inputBody struct {
+				Name string `json:"name"`
+			}
+			request := httptest.NewRequest(http.MethodPost, "/things", strings.NewReader(test.body))
+			if test.contentType != "" {
+				request.Header.Set("Content-Type", test.contentType)
+			}
+
+			_, err := bindInput[inputBody](request, buildInputMetadata[inputBody]("/things"))
+			problem, ok := errors.AsType[*problem](err)
+			if !ok {
+				t.Fatalf("error = %T, want *problem", err)
+			}
+			if problem.Status != test.status {
+				t.Errorf("status = %d, want %d", problem.Status, test.status)
+			}
 		})
 	}
 }
 
-func TestPathNames(t *testing.T) {
-	names := pathNames("/users/{user}/files/{path...}/{$}")
-	if len(names) != 2 {
-		t.Fatalf("names = %#v", names)
+func TestBindInputBindsPathParameter(t *testing.T) {
+	type inputBody struct {
+		ID int `path:"id" json:"-"`
 	}
-	if _, exists := names["user"]; !exists {
-		t.Error("user wildcard is missing")
+	request := httptest.NewRequest(http.MethodGet, "/things/42", nil)
+	request.SetPathValue("id", "42")
+
+	input, err := bindInput[inputBody](request, buildInputMetadata[inputBody]("/things/{id}"))
+
+	if err != nil {
+		t.Fatalf("bindInput() error = %v", err)
 	}
-	if _, exists := names["path"]; !exists {
-		t.Error("catch-all wildcard is missing")
+	if input.ID != 42 {
+		t.Errorf("ID = %d, want %d", input.ID, 42)
 	}
+}
+
+func TestBuildInputMetadataRejectsMissingPathBinding(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("buildInputMetadata() did not panic")
+		}
+	}()
+
+	_ = buildInputMetadata[struct{}]("/things/{id}")
 }

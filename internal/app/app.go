@@ -16,5 +16,6 @@ type Commands struct {
 
 // Queries contains the application's read-only handlers.
 type Queries struct {
-	GetLink GetLinkHandler
+	GetLink   GetLinkHandler
+	ListLinks ListLinksHandler
 }

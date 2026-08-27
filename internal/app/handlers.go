@@ -5,6 +5,7 @@ import (
 
 	"github.com/vekio/shorty/internal/app/createlink"
 	"github.com/vekio/shorty/internal/app/getlink"
+	"github.com/vekio/shorty/internal/app/listlinks"
 	"github.com/vekio/shorty/internal/app/visitlink"
 )
 
@@ -23,4 +24,9 @@ type VisitLinkHandler interface {
 // adapters.
 type GetLinkHandler interface {
 	Handle(context.Context, getlink.GetLinkQuery) (getlink.GetLinkResult, error)
+}
+
+// ListLinksHandler is the list-links query capability exposed to input adapters.
+type ListLinksHandler interface {
+	Handle(context.Context, listlinks.ListLinksQuery) (listlinks.ListLinksResult, error)
 }

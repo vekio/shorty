@@ -9,67 +9,55 @@ import (
 	"testing"
 )
 
-func TestHandlerWritesTypedJSONResponse(t *testing.T) {
-	type output struct {
+func TestRouteMapsHandlerError(t *testing.T) {
+	target := errors.New("thing not found")
+	api := New()
+	api.GET("/things/{id}", func(context.Context, struct {
+		ID string `path:"id" json:"-"`
+	}) (struct{}, error) {
+		return struct{}{}, errors.Join(errors.New("repository"), target)
+	}, MapError(target, http.StatusNotFound))
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/things/42", nil)
+	api.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d", response.Code, http.StatusNotFound)
+	}
+}
+
+func TestRouteLimitsRequestBody(t *testing.T) {
+	api := New()
+	api.POST("/things", func(context.Context, struct {
 		Name string `json:"name"`
-	}
-	app := New()
-	app.POST("/things", func(context.Context, struct{}) (output, error) {
-		return output{Name: "shorty"}, nil
-	}, Status(http.StatusCreated))
-	response := httptest.NewRecorder()
-	app.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/things", nil))
+	}) (struct{}, error) {
+		return struct{}{}, nil
+	}, MaxBodyBytes(4))
 
-	if response.Code != http.StatusCreated || response.Body.String() != `{"name":"shorty"}` {
-		t.Errorf("status = %d, body = %s", response.Code, response.Body.String())
-	}
-	if response.Header().Get("Content-Type") != "application/json" {
-		t.Errorf("Content-Type = %q", response.Header().Get("Content-Type"))
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/things", strings.NewReader(`{"name":"shorty"}`))
+	request.Header.Set("Content-Type", "application/json")
+	api.ServeHTTP(response, request)
+
+	if response.Code != http.StatusRequestEntityTooLarge {
+		t.Errorf("status = %d, want %d", response.Code, http.StatusRequestEntityTooLarge)
 	}
 }
 
-func TestHandlerSuppressesBodyForEmptySuccessStatus(t *testing.T) {
-	for _, status := range []int{http.StatusNoContent, http.StatusResetContent} {
-		t.Run(http.StatusText(status), func(t *testing.T) {
-			app := New()
-			app.POST("/things", func(context.Context, struct{}) (string, error) {
-				return "ignored", nil
-			}, Status(status))
-			response := httptest.NewRecorder()
-			app.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/things", nil))
-			if response.Code != status || response.Body.Len() != 0 {
-				t.Errorf("status = %d, body = %s", response.Code, response.Body.String())
-			}
-		})
-	}
-}
+func TestRawEndpointOwnsResponse(t *testing.T) {
+	api := New()
+	api.RAW(http.MethodGet, "/download", func(w http.ResponseWriter, _ *http.Request) error {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("raw"))
+		return nil
+	})
 
-func TestHandlerReturnsHandlerError(t *testing.T) {
-	errKnown := errors.New("known")
-	app := New()
-	app.MapErrors(func(err error) (*Problem, bool) {
-		return BadRequest("mapped"), errors.Is(err, errKnown)
-	})
-	app.GET("/things", func(context.Context, struct{}) (struct{}, error) {
-		return struct{}{}, errKnown
-	})
 	response := httptest.NewRecorder()
-	app.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/things", nil))
-	assertProblem(t, response, http.StatusBadRequest, "mapped")
-}
+	request := httptest.NewRequest(http.MethodGet, "/download", nil)
+	api.ServeHTTP(response, request)
 
-func TestHandlerHidesResponseEncodingError(t *testing.T) {
-	type output struct {
-		Unsupported func() `json:"unsupported"`
-	}
-	app := New()
-	app.GET("/things", func(context.Context, struct{}) (output, error) {
-		return output{Unsupported: func() {}}, nil
-	})
-	response := httptest.NewRecorder()
-	app.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/things", nil))
-	assertProblem(t, response, http.StatusInternalServerError, "internal server error")
-	if strings.Contains(response.Body.String(), "unsupported Go type") {
-		t.Errorf("encoding error leaked: %s", response.Body.String())
+	if response.Code != http.StatusOK || response.Body.String() != "raw" {
+		t.Errorf("status = %d, body = %q", response.Code, response.Body.String())
 	}
 }

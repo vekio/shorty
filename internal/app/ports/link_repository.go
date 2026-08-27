@@ -13,5 +13,6 @@ var ErrLinkNotFound = errors.New("link not found")
 type LinkRepository interface {
 	Save(context.Context, domain.Link) error
 	FindByCode(context.Context, string) (domain.Link, error)
+	FindAll(context.Context) ([]domain.Link, error)
 	UpdateLinkVisits(context.Context, domain.Link) error
 }

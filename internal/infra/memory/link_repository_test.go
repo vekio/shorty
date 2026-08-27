@@ -37,6 +37,36 @@ func TestFindByCodeReturnsNotFound(t *testing.T) {
 	}
 }
 
+func TestFindAllReturnsAllLinks(t *testing.T) {
+	repository := NewLinkRepository()
+	first, err := domain.New("https://example.com/first")
+	if err != nil {
+		t.Fatalf("create first link: %v", err)
+	}
+	second, err := domain.New("https://example.com/second")
+	if err != nil {
+		t.Fatalf("create second link: %v", err)
+	}
+	if err := repository.Save(t.Context(), first); err != nil {
+		t.Fatalf("save first link: %v", err)
+	}
+	if err := repository.Save(t.Context(), second); err != nil {
+		t.Fatalf("save second link: %v", err)
+	}
+
+	links, err := repository.FindAll(t.Context())
+	if err != nil {
+		t.Fatalf("FindAll() error = %v", err)
+	}
+	if len(links) != 2 {
+		t.Fatalf("FindAll() length = %d, want 2", len(links))
+	}
+	codes := map[string]bool{links[0].Code(): true, links[1].Code(): true}
+	if !codes[first.Code()] || !codes[second.Code()] {
+		t.Errorf("FindAll() codes = %#v", codes)
+	}
+}
+
 func TestUpdateLinkVisitsReturnsNotFound(t *testing.T) {
 	link, err := domain.New("https://example.com")
 	if err != nil {
@@ -61,6 +91,9 @@ func TestOperationsRespectCanceledContext(t *testing.T) {
 	}
 	if _, err := repository.FindByCode(ctx, link.Code()); !errors.Is(err, context.Canceled) {
 		t.Errorf("FindByCode() error = %v, want context canceled", err)
+	}
+	if _, err := repository.FindAll(ctx); !errors.Is(err, context.Canceled) {
+		t.Errorf("FindAll() error = %v, want context canceled", err)
 	}
 	if err := repository.UpdateLinkVisits(ctx, link); !errors.Is(err, context.Canceled) {
 		t.Errorf("UpdateLinkVisits() error = %v, want context canceled", err)
