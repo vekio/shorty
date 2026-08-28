@@ -32,12 +32,13 @@ func TestWriteErrorReturnsSafeInternalServerError(t *testing.T) {
 }
 
 func TestWriteErrorUsesRouteMapping(t *testing.T) {
-	target := errors.New("thing not found")
+	target := errors.New("repository sentinel")
+	publicDetail := "thing not found"
 	request := httptest.NewRequest(http.MethodGet, "/things/42", nil)
 	response := httptest.NewRecorder()
-	route := newRoute(http.MethodGet, "/things/{id}", WithErrorMapping(target, http.StatusNotFound))
+	route := newRoute(http.MethodGet, "/things/{id}", WithErrorMapping(target, http.StatusNotFound, publicDetail))
 
-	writeError(discardLogger(), response, request, route, errors.Join(errors.New("repository"), target))
+	writeError(discardLogger(), response, request, route, errors.Join(errors.New("private database failure"), target))
 
 	if response.Code != http.StatusNotFound {
 		t.Errorf("status = %d, want %d", response.Code, http.StatusNotFound)
@@ -46,8 +47,18 @@ func TestWriteErrorUsesRouteMapping(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &output); err != nil {
 		t.Fatalf("decode problem: %v", err)
 	}
-	if output.Detail != target.Error() || output.Instance != "/things/42" {
+	if output.Detail != publicDetail || output.Instance != "/things/42" {
 		t.Errorf("problem = %#v", output)
+	}
+}
+
+func TestErrorMappingAllowsOmittingPublicDetail(t *testing.T) {
+	target := errors.New("private failure")
+	route := newRoute(http.MethodGet, "/things", WithErrorMapping(target, http.StatusNotFound, ""))
+
+	problem := route.resolveProblem(target)
+	if problem.Status != http.StatusNotFound || problem.Detail != "" {
+		t.Errorf("problem = %#v", problem)
 	}
 }
 

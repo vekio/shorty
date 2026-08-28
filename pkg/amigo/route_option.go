@@ -44,9 +44,9 @@ func WithMiddleware(middlewares ...Middleware) RouteOption {
 }
 
 // WithErrorMapping translates errors matching target through [errors.Is] into
-// an RFC 9457 response. Its public detail is target.Error(), not the wrapped
-// error.
-func WithErrorMapping(target error, status int) RouteOption {
+// an RFC 9457 response. publicDetail must be safe to expose to HTTP clients;
+// the original error is never copied into the response automatically.
+func WithErrorMapping(target error, status int, publicDetail string) RouteOption {
 	if target == nil {
 		panic("amigo: mapped error cannot be nil")
 	}
@@ -56,8 +56,9 @@ func WithErrorMapping(target error, status int) RouteOption {
 
 	return func(route *route) {
 		route.errorMappings = append(route.errorMappings, errorMapping{
-			target: target,
-			status: status,
+			target:       target,
+			status:       status,
+			publicDetail: publicDetail,
 		})
 	}
 }

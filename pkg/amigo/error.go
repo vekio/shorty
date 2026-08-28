@@ -8,8 +8,9 @@ import (
 )
 
 type errorMapping struct {
-	target error
-	status int
+	target       error
+	status       int
+	publicDetail string
 }
 
 // resolveProblem converts an endpoint error into a safe client representation.
@@ -27,7 +28,7 @@ func (r route) resolveProblem(err error) *problem {
 
 	for _, mapping := range r.errorMappings {
 		if errors.Is(err, mapping.target) {
-			return newProblem(mapping.status, mapping.target.Error())
+			return newProblem(mapping.status, mapping.publicDetail)
 		}
 	}
 

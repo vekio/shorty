@@ -16,7 +16,7 @@ func TestRouteMapsHandlerError(t *testing.T) {
 		ID string `path:"id" json:"-"`
 	}) (struct{}, error) {
 		return struct{}{}, errors.Join(errors.New("repository"), target)
-	}, WithErrorMapping(target, http.StatusNotFound))
+	}, WithErrorMapping(target, http.StatusNotFound, "thing not found"))
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/things/42", nil)
@@ -67,7 +67,7 @@ func TestRawEndpointMapsReturnedError(t *testing.T) {
 	api := New()
 	api.RAW(http.MethodGet, "/download", func(http.ResponseWriter, *http.Request) error {
 		return target
-	}, WithErrorMapping(target, http.StatusServiceUnavailable))
+	}, WithErrorMapping(target, http.StatusServiceUnavailable, "download unavailable"))
 
 	response := httptest.NewRecorder()
 	api.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/download", nil))

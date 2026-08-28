@@ -44,6 +44,14 @@ func (app *API) Group(prefix string, middlewares ...Middleware) *Router {
 
 // ServeHTTP implements http.Handler.
 func (app *API) ServeHTTP(w http.ResponseWriter, request *http.Request) {
+	handler, pattern := app.mux.Handler(request)
+	if pattern == "" {
+		fallback := inspectMuxFallback(handler, request)
+		if fallback.status == http.StatusNotFound || fallback.status == http.StatusMethodNotAllowed {
+			writeRoutingProblem(w, request, fallback)
+			return
+		}
+	}
 	app.mux.ServeHTTP(w, request)
 }
 

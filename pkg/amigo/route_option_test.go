@@ -8,9 +8,12 @@ import (
 
 func TestWithErrorMappingAddsRouteMapping(t *testing.T) {
 	target := errors.New("conflict")
-	route := newRoute(http.MethodPost, "/things", WithErrorMapping(target, http.StatusConflict))
+	route := newRoute(http.MethodPost, "/things", WithErrorMapping(target, http.StatusConflict, "thing already exists"))
 
-	if len(route.errorMappings) != 1 || !errors.Is(route.errorMappings[0].target, target) || route.errorMappings[0].status != http.StatusConflict {
+	if len(route.errorMappings) != 1 ||
+		!errors.Is(route.errorMappings[0].target, target) ||
+		route.errorMappings[0].status != http.StatusConflict ||
+		route.errorMappings[0].publicDetail != "thing already exists" {
 		t.Errorf("errorMappings = %#v", route.errorMappings)
 	}
 }
@@ -79,7 +82,7 @@ func TestWithErrorMappingRejectsInvalidConfiguration(t *testing.T) {
 					t.Error("WithErrorMapping() did not panic")
 				}
 			}()
-			_ = WithErrorMapping(test.target, test.status)
+			_ = WithErrorMapping(test.target, test.status, "public failure")
 		})
 	}
 }
