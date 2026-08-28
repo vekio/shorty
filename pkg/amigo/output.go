@@ -33,7 +33,7 @@ func writeOutput[Out any](
 
 func writeOutputHeaders(w http.ResponseWriter, output reflect.Value, headers []outputHeader) {
 	for _, header := range headers {
-		if value := output.FieldByIndex(header.index).String(); value != "" {
+		if value := output.FieldByIndex(header.fieldIndex).String(); value != "" {
 			w.Header().Set(header.name, value)
 		}
 	}

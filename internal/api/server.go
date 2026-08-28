@@ -11,19 +11,21 @@ import (
 )
 
 // New builds the HTTP API and registers all routes.
-func New(application app.Application) *amigo.Api {
+func New(application app.Application) *amigo.API {
 	endpoints := newHandlers(application)
 	api := amigo.New()
-	api.POST("/links", endpoints.CreateLink,
+	registerValidators(api)
+	links := api.Group("/links", logRequest)
+	links.POST("", endpoints.CreateLink,
 		amigo.Status(http.StatusCreated),
 		amigo.MapError(domain.ErrOriginURLRequired, http.StatusBadRequest),
 		amigo.MapError(domain.ErrOriginURLInvalid, http.StatusBadRequest),
 	)
-	api.GET("/links", endpoints.ListLinks)
-	api.GET("/links/{id}", endpoints.GetLink,
+	links.GET("", endpoints.ListLinks)
+	links.GET("/{id}", endpoints.GetLink,
 		amigo.MapError(ports.ErrLinkNotFound, http.StatusNotFound),
 	)
-	api.POST("/links/{id}/visit", endpoints.VisitLink,
+	links.POST("/{id}/visit", endpoints.VisitLink,
 		amigo.Status(http.StatusNoContent),
 		amigo.MapError(ports.ErrLinkNotFound, http.StatusNotFound),
 	)

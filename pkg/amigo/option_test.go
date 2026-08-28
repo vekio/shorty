@@ -10,8 +10,8 @@ func TestMapErrorAddsRouteMapping(t *testing.T) {
 	target := errors.New("conflict")
 	route := newRoute(http.MethodPost, "/things", MapError(target, http.StatusConflict))
 
-	if len(route.errors) != 1 || !errors.Is(route.errors[0].target, target) || route.errors[0].status != http.StatusConflict {
-		t.Errorf("errors = %#v", route.errors)
+	if len(route.errorMappings) != 1 || !errors.Is(route.errorMappings[0].target, target) || route.errorMappings[0].status != http.StatusConflict {
+		t.Errorf("errorMappings = %#v", route.errorMappings)
 	}
 }
 
@@ -42,6 +42,25 @@ func TestRouteOptionsOverrideDefaults(t *testing.T) {
 	}
 }
 
+func TestUseAddsRouteMiddleware(t *testing.T) {
+	middleware := func(next http.Handler) http.Handler { return next }
+	route := newRoute(http.MethodGet, "/things", Use(middleware))
+
+	if len(route.middlewares) != 1 {
+		t.Errorf("middlewares = %d, want %d", len(route.middlewares), 1)
+	}
+}
+
+func TestUseRejectsNilMiddleware(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Error("Use() did not panic")
+		}
+	}()
+
+	_ = Use(nil)
+}
+
 func TestMapErrorRejectsInvalidConfiguration(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -63,4 +82,20 @@ func TestMapErrorRejectsInvalidConfiguration(t *testing.T) {
 			_ = MapError(test.target, test.status)
 		})
 	}
+}
+
+func TestStatusRejectsNonSuccessStatus(t *testing.T) {
+	for _, status := range []int{http.StatusContinue, http.StatusMultipleChoices} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			assertPanics(t, func() { Status(status) })
+		})
+	}
+}
+
+func TestMaxBodyBytesRejectsNegativeLimit(t *testing.T) {
+	assertPanics(t, func() { MaxBodyBytes(-1) })
+}
+
+func TestNewRouteRejectsNilOption(t *testing.T) {
+	assertPanics(t, func() { newRoute(http.MethodGet, "/things", nil) })
 }

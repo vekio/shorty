@@ -2,12 +2,40 @@ package amigo
 
 import (
 	"encoding/json/v2"
+	"errors"
 	"log/slog"
 	"net/http"
 )
 
+type errorMapping struct {
+	target error
+	status int
+}
+
+// resolveProblem converts an endpoint error into a safe client representation.
+// Explicit problems win, followed by route mappings; everything else is a 500.
+func (r route) resolveProblem(err error) *problem {
+	if direct, ok := errors.AsType[*problem](err); ok {
+		clone := *direct
+		return &clone
+	}
+	if invalid, ok := errors.AsType[*validationError](err); ok {
+		problem := newProblem(http.StatusUnprocessableEntity, invalid.Error())
+		problem.Errors = invalid.errors
+		return problem
+	}
+
+	for _, mapping := range r.errorMappings {
+		if errors.Is(err, mapping.target) {
+			return newProblem(mapping.status, mapping.target.Error())
+		}
+	}
+
+	return newProblem(http.StatusInternalServerError, "internal server error")
+}
+
 func writeError(w http.ResponseWriter, request *http.Request, route route, err error) {
-	problem := route.problem(err)
+	problem := route.resolveProblem(err)
 	problem.Instance = request.URL.Path
 
 	if problem.Status >= http.StatusInternalServerError {

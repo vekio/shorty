@@ -1,56 +1,172 @@
 package amigo
 
 import (
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"io"
 	"mime"
 	"net/http"
 	"reflect"
 	"strconv"
-	"strings"
 )
 
-func bindInput[In any](request *http.Request, metadata inputMetadata) (In, error) {
-	var input In
-	if err := bindJSONBody(request, &input); err != nil {
-		return input, err
-	}
-	if err := bindPathParameters(reflect.ValueOf(&input).Elem(), request, metadata.path); err != nil {
-		return input, err
-	}
-	return input, nil
+type fieldSet map[int]struct{}
+
+func (fields fieldSet) add(fieldID int) {
+	fields[fieldID] = struct{}{}
 }
 
-func bindJSONBody(request *http.Request, destination any) error {
+func (fields fieldSet) contains(fieldID int) bool {
+	_, exists := fields[fieldID]
+	return exists
+}
+
+type boundInput[In any] struct {
+	value   In
+	present fieldSet
+}
+
+func bindInput[In any](request *http.Request, metadata inputMetadata) (In, error) {
+	bound, err := bindInputWithPresence[In](request, metadata)
+	return bound.value, err
+}
+
+func bindInputWithPresence[In any](
+	request *http.Request,
+	metadata inputMetadata,
+) (boundInput[In], error) {
+	var input In
+	value := reflect.ValueOf(&input).Elem()
+	bound := boundInput[In]{value: input, present: make(fieldSet)}
+
+	properties, err := bindJSONBody(request, &input)
+	if err != nil {
+		return bound, err
+	}
+	markBodyFields(bound.present, properties, metadata.bodyFields)
+	if err := bindPathParameters(value, request, metadata.pathParameters, bound.present); err != nil {
+		return bound, err
+	}
+	if err := bindQueryParameters(value, request, metadata.queryParameters, bound.present); err != nil {
+		return bound, err
+	}
+	if err := bindHeaderParameters(value, request, metadata.headerParameters, bound.present); err != nil {
+		return bound, err
+	}
+	bound.value = input
+	return bound, nil
+}
+
+func limitRequestBody(w http.ResponseWriter, request *http.Request, limit int64) {
+	if limit > 0 && request.Body != nil {
+		request.Body = http.MaxBytesReader(w, request.Body, limit)
+	}
+}
+
+func bindJSONBody(request *http.Request, destination any) (map[string]jsontext.Value, error) {
 	if request.Body == nil || request.Body == http.NoBody || request.ContentLength == 0 {
-		return nil
+		return nil, nil
 	}
 
 	mediaType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
 	if err != nil || mediaType != "application/json" {
-		return newProblem(http.StatusUnsupportedMediaType, "content type must be application/json")
+		return nil, newProblem(http.StatusUnsupportedMediaType, "content type must be application/json")
 	}
 
-	if err := json.UnmarshalRead(request.Body, destination, json.RejectUnknownMembers(true)); err != nil {
+	data, err := io.ReadAll(request.Body)
+	if err != nil {
 		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
-			return newProblem(http.StatusRequestEntityTooLarge, "request body exceeds the maximum allowed size")
+			return nil, newProblem(http.StatusRequestEntityTooLarge, "request body exceeds the maximum allowed size")
 		}
-		return newProblem(http.StatusBadRequest, "invalid JSON request body")
+		return nil, fmt.Errorf("read request body: %w", err)
 	}
-	return nil
+	if err := json.Unmarshal(data, destination, json.RejectUnknownMembers(true)); err != nil {
+		return nil, newProblem(http.StatusBadRequest, "invalid JSON request body")
+	}
+
+	var properties map[string]jsontext.Value
+	if err := json.Unmarshal(data, &properties); err != nil {
+		return nil, newProblem(http.StatusBadRequest, "invalid JSON request body")
+	}
+	return properties, nil
 }
 
-func bindPathParameters(value reflect.Value, request *http.Request, parameters []pathParameter) error {
+func markBodyFields(present fieldSet, properties map[string]jsontext.Value, bodyFields map[string]int) {
+	for name, rawValue := range properties {
+		if rawValue.Kind() == jsontext.KindNull {
+			continue
+		}
+		if fieldID, exists := bodyFields[name]; exists {
+			present.add(fieldID)
+		}
+	}
+}
+
+func bindPathParameters(
+	value reflect.Value,
+	request *http.Request,
+	parameters []inputParameter,
+	present fieldSet,
+) error {
 	for _, parameter := range parameters {
-		if err := setPathParameter(value.FieldByIndex(parameter.index), request.PathValue(parameter.name)); err != nil {
-			return newProblem(http.StatusBadRequest, fmt.Sprintf("invalid path parameter %q", parameter.name))
+		if err := bindParameterValue(value, parameter, request.PathValue(parameter.name), "path"); err != nil {
+			return err
 		}
+		present.add(parameter.fieldID)
 	}
 	return nil
 }
 
-func setPathParameter(field reflect.Value, value string) error {
+func bindQueryParameters(
+	value reflect.Value,
+	request *http.Request,
+	parameters []inputParameter,
+	present fieldSet,
+) error {
+	query := request.URL.Query()
+	for _, parameter := range parameters {
+		values, exists := query[parameter.name]
+		if !exists {
+			continue
+		}
+		if err := bindParameterValue(value, parameter, values[0], "query"); err != nil {
+			return err
+		}
+		present.add(parameter.fieldID)
+	}
+	return nil
+}
+
+func bindHeaderParameters(
+	value reflect.Value,
+	request *http.Request,
+	parameters []inputParameter,
+	present fieldSet,
+) error {
+	for _, parameter := range parameters {
+		values := request.Header.Values(parameter.name)
+		if len(values) == 0 {
+			continue
+		}
+		if err := bindParameterValue(value, parameter, values[0], "header"); err != nil {
+			return err
+		}
+		present.add(parameter.fieldID)
+	}
+	return nil
+}
+
+func bindParameterValue(value reflect.Value, parameter inputParameter, rawValue string, source string) error {
+	field := value.FieldByIndex(parameter.fieldIndex)
+	if err := setParameterValue(field, rawValue); err != nil {
+		return newProblem(http.StatusBadRequest, fmt.Sprintf("invalid %s parameter %q", source, parameter.name))
+	}
+	return nil
+}
+
+func setParameterValue(field reflect.Value, value string) error {
 	switch field.Kind() {
 	case reflect.String:
 		field.SetString(value)
@@ -73,32 +189,7 @@ func setPathParameter(field reflect.Value, value string) error {
 		}
 		field.SetUint(parsed)
 	default:
-		panic("amigo: unsupported path parameter type reached binding")
+		panic("amigo: unsupported input parameter type reached binding")
 	}
 	return nil
-}
-
-func supportsPathType(type_ reflect.Type) bool {
-	switch type_.Kind() {
-	case reflect.String, reflect.Bool,
-		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return true
-	default:
-		return false
-	}
-}
-
-func routePathNames(path string) map[string]struct{} {
-	names := make(map[string]struct{})
-	for segment := range strings.SplitSeq(path, "/") {
-		if len(segment) < 3 || segment[0] != '{' || segment[len(segment)-1] != '}' {
-			continue
-		}
-		name := strings.TrimSuffix(segment[1:len(segment)-1], "...")
-		if name != "$" {
-			names[name] = struct{}{}
-		}
-	}
-	return names
 }

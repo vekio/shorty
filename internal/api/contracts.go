@@ -5,11 +5,11 @@ import "time"
 type Empty struct{}
 
 type LinkByIDInput struct {
-	Code string `path:"id" json:"-"`
+	Code string `path:"id" json:"-" validate:"required"`
 }
 
 type CreateLinkInput struct {
-	OriginURL string `json:"origin_url"`
+	OriginURL string `json:"origin_url" validate:"required,url"`
 }
 
 type CreateLinkOutput struct {

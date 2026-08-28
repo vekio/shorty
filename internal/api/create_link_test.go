@@ -29,17 +29,47 @@ func TestCreateLink(t *testing.T) {
 	}
 }
 
-func TestCreateLinkMapsDomainError(t *testing.T) {
+func TestCreateLinkValidatesOriginURL(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/links", strings.NewReader(`{"origin_url":"not-a-url"}`))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
 	newTestAPI().ServeHTTP(response, request)
 
-	if response.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusBadRequest, response.Body.String())
+	if response.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusUnprocessableEntity, response.Body.String())
 	}
-	if !strings.Contains(response.Body.String(), `"detail":"origin URL must be an absolute HTTP or HTTPS URL"`) {
-		t.Errorf("body = %s, want mapped domain error", response.Body.String())
+	if !strings.Contains(response.Body.String(), `"location":"body.origin_url"`) ||
+		!strings.Contains(response.Body.String(), `"message":"origin URL must be an absolute HTTP or HTTPS URL"`) {
+		t.Errorf("body = %s, want URL validation error", response.Body.String())
+	}
+}
+
+func TestCreateLinkRequiresOriginURL(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+	}{
+		{name: "missing body"},
+		{name: "missing property", body: `{}`},
+		{name: "null property", body: `{"origin_url":null}`},
+		{name: "blank property", body: `{"origin_url":"  "}`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, "/links", strings.NewReader(test.body))
+			request.Header.Set("Content-Type", "application/json")
+			response := httptest.NewRecorder()
+			newTestAPI().ServeHTTP(response, request)
+
+			if response.Code != http.StatusUnprocessableEntity {
+				t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusUnprocessableEntity, response.Body.String())
+			}
+			if !strings.Contains(response.Body.String(), `"location":"body.origin_url"`) ||
+				!strings.Contains(response.Body.String(), `"message":"is required"`) {
+				t.Errorf("body = %s, want required origin_url error", response.Body.String())
+			}
+		})
 	}
 }
 
@@ -50,7 +80,6 @@ func TestCreateLinkRejectsInvalidJSONRequest(t *testing.T) {
 		contentType string
 		status      int
 	}{
-		{name: "missing body", contentType: "application/json", status: http.StatusBadRequest},
 		{name: "wrong content type", body: `{}`, contentType: "text/plain", status: http.StatusUnsupportedMediaType},
 		{name: "invalid JSON", body: `{"origin_url":`, contentType: "application/json", status: http.StatusBadRequest},
 		{name: "unknown field", body: `{"origin_url":"https://example.com","extra":true}`, contentType: "application/json", status: http.StatusBadRequest},

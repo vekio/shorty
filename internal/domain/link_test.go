@@ -56,6 +56,15 @@ func TestNewRejectsInvalidOriginURL(t *testing.T) {
 	}
 }
 
+func TestValidateOriginURL(t *testing.T) {
+	if err := ValidateOriginURL("https://example.com/docs"); err != nil {
+		t.Errorf("ValidateOriginURL() error = %v", err)
+	}
+	if err := ValidateOriginURL("not-a-url"); !errors.Is(err, ErrOriginURLInvalid) {
+		t.Errorf("ValidateOriginURL() error = %v, want %v", err, ErrOriginURLInvalid)
+	}
+}
+
 func TestRegisterVisitMutatesOnlyReceiver(t *testing.T) {
 	link, err := New("https://example.com")
 	if err != nil {

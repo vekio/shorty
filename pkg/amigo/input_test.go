@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -15,7 +16,7 @@ func TestBindInputDecodesJSON(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/things", strings.NewReader(`{"name":"shorty"}`))
 	request.Header.Set("Content-Type", "application/json; charset=utf-8")
 
-	input, err := bindInput[inputBody](request, buildInputMetadata[inputBody]("/things"))
+	input, err := bindInput[inputBody](request, buildInputMetadata[inputBody]("/things", newValidatorRegistry()))
 
 	if err != nil {
 		t.Fatalf("bindInput() error = %v", err)
@@ -29,7 +30,7 @@ func TestBindInputAllowsMissingBody(t *testing.T) {
 	type inputBody struct{ Name string }
 	request := httptest.NewRequest(http.MethodGet, "/things", nil)
 
-	input, err := bindInput[inputBody](request, buildInputMetadata[inputBody]("/things"))
+	input, err := bindInput[inputBody](request, buildInputMetadata[inputBody]("/things", newValidatorRegistry()))
 
 	if err != nil {
 		t.Fatalf("bindInput() error = %v", err)
@@ -62,7 +63,7 @@ func TestBindInputRejectsInvalidJSONRequests(t *testing.T) {
 				request.Header.Set("Content-Type", test.contentType)
 			}
 
-			_, err := bindInput[inputBody](request, buildInputMetadata[inputBody]("/things"))
+			_, err := bindInput[inputBody](request, buildInputMetadata[inputBody]("/things", newValidatorRegistry()))
 			problem, ok := errors.AsType[*problem](err)
 			if !ok {
 				t.Fatalf("error = %T, want *problem", err)
@@ -81,7 +82,7 @@ func TestBindInputBindsPathParameter(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/things/42", nil)
 	request.SetPathValue("id", "42")
 
-	input, err := bindInput[inputBody](request, buildInputMetadata[inputBody]("/things/{id}"))
+	input, err := bindInput[inputBody](request, buildInputMetadata[inputBody]("/things/{id}", newValidatorRegistry()))
 
 	if err != nil {
 		t.Fatalf("bindInput() error = %v", err)
@@ -91,12 +92,158 @@ func TestBindInputBindsPathParameter(t *testing.T) {
 	}
 }
 
-func TestBuildInputMetadataRejectsMissingPathBinding(t *testing.T) {
-	defer func() {
-		if recover() == nil {
-			t.Error("buildInputMetadata() did not panic")
-		}
-	}()
+func TestBindInputBindsQueryAndHeaderParameters(t *testing.T) {
+	type input struct {
+		Search    string `query:"search" json:"-"`
+		Page      uint   `query:"page" json:"-"`
+		RequestID string `header:"X-Request-ID" json:"-"`
+		Preview   bool   `header:"X-Preview" json:"-"`
+	}
+	request := httptest.NewRequest(http.MethodGet, "/things?search=shorty&page=2", nil)
+	request.Header.Set("x-request-id", "request-42")
+	request.Header.Set("X-Preview", "true")
 
-	_ = buildInputMetadata[struct{}]("/things/{id}")
+	got, err := bindInput[input](request, buildInputMetadata[input]("/things", newValidatorRegistry()))
+	if err != nil {
+		t.Fatalf("bindInput() error = %v", err)
+	}
+	want := input{Search: "shorty", Page: 2, RequestID: "request-42", Preview: true}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("input = %#v, want %#v", got, want)
+	}
+}
+
+func TestBindInputLeavesAbsentQueryAndHeaderParametersAtZeroValue(t *testing.T) {
+	type input struct {
+		Page    int  `query:"page" json:"-"`
+		Preview bool `header:"X-Preview" json:"-"`
+	}
+	request := httptest.NewRequest(http.MethodGet, "/things", nil)
+
+	got, err := bindInput[input](request, buildInputMetadata[input]("/things", newValidatorRegistry()))
+	if err != nil {
+		t.Fatalf("bindInput() error = %v", err)
+	}
+	if got.Page != 0 || got.Preview {
+		t.Errorf("input = %#v, want zero value", got)
+	}
+}
+
+func TestBindInputReportsInvalidQueryAndHeaderParameters(t *testing.T) {
+	tests := []struct {
+		name       string
+		request    *http.Request
+		bind       func(*http.Request) error
+		wantDetail string
+	}{
+		{
+			name:    "query",
+			request: httptest.NewRequest(http.MethodGet, "/things?page=many", nil),
+			bind: func(request *http.Request) error {
+				type input struct {
+					Page int `query:"page" json:"-"`
+				}
+				_, err := bindInput[input](request, buildInputMetadata[input]("/things", newValidatorRegistry()))
+				return err
+			},
+			wantDetail: `invalid query parameter "page"`,
+		},
+		{
+			name: "header",
+			request: func() *http.Request {
+				request := httptest.NewRequest(http.MethodGet, "/things", nil)
+				request.Header.Set("X-Preview", "sometimes")
+				return request
+			}(),
+			bind: func(request *http.Request) error {
+				type input struct {
+					Preview bool `header:"X-Preview" json:"-"`
+				}
+				_, err := bindInput[input](request, buildInputMetadata[input]("/things", newValidatorRegistry()))
+				return err
+			},
+			wantDetail: `invalid header parameter "X-Preview"`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			problem, ok := errors.AsType[*problem](test.bind(test.request))
+			if !ok {
+				t.Fatal("error is not an HTTP problem")
+			}
+			if problem.Status != http.StatusBadRequest || problem.Detail != test.wantDetail {
+				t.Errorf("problem = %#v", problem)
+			}
+		})
+	}
+}
+
+func TestSetParameterValueSupportsScalarTypes(t *testing.T) {
+	tests := []struct {
+		name  string
+		type_ reflect.Type
+		value string
+		want  any
+	}{
+		{name: "string", type_: reflect.TypeFor[string](), value: "abc", want: "abc"},
+		{name: "boolean", type_: reflect.TypeFor[bool](), value: "true", want: true},
+		{name: "signed integer", type_: reflect.TypeFor[int32](), value: "-42", want: int32(-42)},
+		{name: "unsigned integer", type_: reflect.TypeFor[uint16](), value: "42", want: uint16(42)},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			field := reflect.New(test.type_).Elem()
+			if err := setParameterValue(field, test.value); err != nil {
+				t.Fatalf("setParameterValue() error = %v", err)
+			}
+			if got := field.Interface(); !reflect.DeepEqual(got, test.want) {
+				t.Errorf("value = %#v, want %#v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestSetParameterValueRejectsInvalidScalars(t *testing.T) {
+	tests := []struct {
+		name  string
+		type_ reflect.Type
+	}{
+		{name: "boolean", type_: reflect.TypeFor[bool]()},
+		{name: "signed integer", type_: reflect.TypeFor[int]()},
+		{name: "unsigned integer", type_: reflect.TypeFor[uint]()},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			field := reflect.New(test.type_).Elem()
+			if err := setParameterValue(field, "not-a-value"); err == nil {
+				t.Error("setParameterValue() error = nil")
+			}
+		})
+	}
+}
+
+func TestBindInputReportsInvalidPathParameter(t *testing.T) {
+	type input struct {
+		ID int `path:"id" json:"-"`
+	}
+	request := httptest.NewRequest(http.MethodGet, "/things/not-a-number", nil)
+	request.SetPathValue("id", "not-a-number")
+
+	_, err := bindInput[input](request, buildInputMetadata[input]("/things/{id}", newValidatorRegistry()))
+	problem, ok := errors.AsType[*problem](err)
+	if !ok {
+		t.Fatalf("error = %T, want *problem", err)
+	}
+	if problem.Status != http.StatusBadRequest || problem.Detail != `invalid path parameter "id"` {
+		t.Errorf("problem = %#v", problem)
+	}
+}
+
+func TestSetParameterValuePanicsForUnsupportedType(t *testing.T) {
+	assertPanics(t, func() {
+		_ = setParameterValue(reflect.ValueOf(new(float64)).Elem(), "1.5")
+	})
 }

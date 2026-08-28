@@ -61,3 +61,81 @@ func TestRawEndpointOwnsResponse(t *testing.T) {
 		t.Errorf("status = %d, body = %q", response.Code, response.Body.String())
 	}
 }
+
+func TestRawEndpointMapsReturnedError(t *testing.T) {
+	target := errors.New("download unavailable")
+	api := New()
+	api.RAW(http.MethodGet, "/download", func(http.ResponseWriter, *http.Request) error {
+		return target
+	}, MapError(target, http.StatusServiceUnavailable))
+
+	response := httptest.NewRecorder()
+	api.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/download", nil))
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Errorf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+}
+
+func TestTypedEndpointReportsResponseEncodingFailure(t *testing.T) {
+	api := New()
+	api.GET("/things", func(context.Context, struct{}) (struct {
+		Unsupported func() `json:"unsupported"`
+	}, error) {
+		return struct {
+			Unsupported func() `json:"unsupported"`
+		}{Unsupported: func() {}}, nil
+	})
+
+	response := httptest.NewRecorder()
+	api.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/things", nil))
+
+	if response.Code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want %d", response.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestRouteMiddlewareWrapsTypedAndRawEndpoints(t *testing.T) {
+	markResponse := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+			w.Header().Set("X-Middleware", "applied")
+			next.ServeHTTP(w, request)
+		})
+	}
+
+	tests := []struct {
+		name     string
+		register func(*API)
+	}{
+		{
+			name: "typed",
+			register: func(api *API) {
+				api.GET("/things", func(context.Context, struct{}) (struct{}, error) {
+					return struct{}{}, nil
+				}, Use(markResponse))
+			},
+		},
+		{
+			name: "raw",
+			register: func(api *API) {
+				api.RAW(http.MethodGet, "/things", func(w http.ResponseWriter, _ *http.Request) error {
+					w.WriteHeader(http.StatusNoContent)
+					return nil
+				}, Use(markResponse))
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			api := New()
+			test.register(api)
+			response := httptest.NewRecorder()
+			api.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/things", nil))
+
+			if response.Header().Get("X-Middleware") != "applied" {
+				t.Errorf("X-Middleware = %q", response.Header().Get("X-Middleware"))
+			}
+		})
+	}
+}

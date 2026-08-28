@@ -7,12 +7,17 @@ import (
 )
 
 type inputMetadata struct {
-	path []pathParameter
+	pathParameters   []inputParameter
+	queryParameters  []inputParameter
+	headerParameters []inputParameter
+	bodyFields       map[string]int
+	validations      []fieldValidation
 }
 
-type pathParameter struct {
-	name  string
-	index []int
+type inputParameter struct {
+	name       string
+	fieldID    int
+	fieldIndex []int
 }
 
 type outputMetadata struct {
@@ -20,58 +25,86 @@ type outputMetadata struct {
 }
 
 type outputHeader struct {
-	name  string
-	index []int
+	name       string
+	fieldIndex []int
 }
 
-func buildInputMetadata[In any](path string) inputMetadata {
+func buildInputMetadata[In any](
+	path string,
+	validators validatorRegistry,
+) inputMetadata {
 	inputType := reflect.TypeFor[In]()
 	if inputType.Kind() != reflect.Struct {
 		panic(fmt.Sprintf("amigo: endpoint input must be a struct, got %s", inputType))
 	}
 
 	pathNames := routePathNames(path)
-	boundNames := make(map[string]struct{}, len(pathNames))
-	metadata := inputMetadata{}
+	boundPathNames := make(map[string]struct{}, len(pathNames))
+	boundQueryNames := make(map[string]struct{})
+	boundHeaderNames := make(map[string]struct{})
+	metadata := inputMetadata{bodyFields: make(map[string]int)}
 
 	for field := range inputType.Fields() {
-		name, tagged := field.Tag.Lookup("path")
-		if !tagged {
-			continue
-		}
-		if !field.IsExported() {
-			panic(fmt.Sprintf("amigo: path field %s must be exported", field.Name))
-		}
-		if name == "" {
-			panic(fmt.Sprintf("amigo: path field %s has an empty name", field.Name))
-		}
-		if _, exists := pathNames[name]; !exists {
-			panic(fmt.Sprintf("amigo: path parameter %q is not present in route %q", name, path))
-		}
-		if _, exists := boundNames[name]; exists {
-			panic(fmt.Sprintf("amigo: path parameter %q is bound more than once", name))
-		}
-		if !supportsPathType(field.Type) {
-			panic(fmt.Sprintf("amigo: path parameter %q has unsupported type %s", name, field.Type))
-		}
-		if jsonName(field.Tag.Get("json")) != "-" {
-			panic(fmt.Sprintf("amigo: path field %s must use json:\"-\"", field.Name))
-		}
+		checkSingleInputSource(field)
+		fieldID := field.Index[0]
 
-		boundNames[name] = struct{}{}
-		metadata.path = append(metadata.path, pathParameter{
-			name:  name,
-			index: field.Index,
-		})
+		if parameter, ok := buildPathParameter(field, fieldID, path, pathNames, boundPathNames); ok {
+			metadata.pathParameters = append(metadata.pathParameters, parameter)
+		}
+		if parameter, ok := buildInputParameter(field, fieldID, "query", boundQueryNames); ok {
+			metadata.queryParameters = append(metadata.queryParameters, parameter)
+		}
+		if parameter, ok := buildInputParameter(field, fieldID, "header", boundHeaderNames); ok {
+			metadata.headerParameters = append(metadata.headerParameters, parameter)
+		}
+		if validation, ok := buildFieldValidation(field, fieldID, validators); ok {
+			metadata.validations = append(metadata.validations, validation)
+			if source, name := inputFieldLocation(field); source == "body" {
+				metadata.bodyFields[name] = fieldID
+			}
+		}
 	}
 
 	for name := range pathNames {
-		if _, exists := boundNames[name]; !exists {
+		if _, exists := boundPathNames[name]; !exists {
 			panic(fmt.Sprintf("amigo: path parameter %q is not bound by the endpoint input", name))
 		}
 	}
 
 	return metadata
+}
+
+func buildPathParameter(
+	field reflect.StructField,
+	fieldID int,
+	path string,
+	pathNames map[string]struct{},
+	boundNames map[string]struct{},
+) (inputParameter, bool) {
+	name, tagged := field.Tag.Lookup("path")
+	if !tagged {
+		return inputParameter{}, false
+	}
+	checkPathField(field, name, path, pathNames, boundNames)
+
+	boundNames[name] = struct{}{}
+	return inputParameter{name: name, fieldID: fieldID, fieldIndex: field.Index}, true
+}
+
+func buildInputParameter(
+	field reflect.StructField,
+	fieldID int,
+	tag string,
+	boundNames map[string]struct{},
+) (inputParameter, bool) {
+	name, tagged := field.Tag.Lookup(tag)
+	if !tagged {
+		return inputParameter{}, false
+	}
+	checkInputParameterField(field, tag, name, boundNames)
+
+	boundNames[normalizedParameterName(tag, name)] = struct{}{}
+	return inputParameter{name: name, fieldID: fieldID, fieldIndex: field.Index}, true
 }
 
 func buildOutputMetadata[Out any]() outputMetadata {
@@ -82,28 +115,39 @@ func buildOutputMetadata[Out any]() outputMetadata {
 
 	metadata := outputMetadata{}
 	for field := range outputType.Fields() {
-		name, tagged := field.Tag.Lookup("header")
-		if !tagged {
+		header, ok := buildOutputHeader(field)
+		if !ok {
 			continue
 		}
-		if !field.IsExported() {
-			panic(fmt.Sprintf("amigo: header field %s must be exported", field.Name))
-		}
-		if name == "" {
-			panic(fmt.Sprintf("amigo: header field %s has an empty name", field.Name))
-		}
-		if field.Type.Kind() != reflect.String {
-			panic(fmt.Sprintf("amigo: response header %q must be a string", name))
-		}
-		if jsonName(field.Tag.Get("json")) != "-" {
-			panic(fmt.Sprintf("amigo: header field %s must use json:\"-\"", field.Name))
-		}
-		metadata.headers = append(metadata.headers, outputHeader{name: name, index: field.Index})
+		metadata.headers = append(metadata.headers, header)
 	}
 	return metadata
 }
 
-func jsonName(tag string) string {
+func buildOutputHeader(field reflect.StructField) (outputHeader, bool) {
+	name, tagged := field.Tag.Lookup("header")
+	if !tagged {
+		return outputHeader{}, false
+	}
+	checkOutputHeaderField(field, name)
+	return outputHeader{name: name, fieldIndex: field.Index}, true
+}
+
+func routePathNames(path string) map[string]struct{} {
+	names := make(map[string]struct{})
+	for segment := range strings.SplitSeq(path, "/") {
+		if len(segment) < 3 || segment[0] != '{' || segment[len(segment)-1] != '}' {
+			continue
+		}
+		name := strings.TrimSuffix(segment[1:len(segment)-1], "...")
+		if name != "$" {
+			names[name] = struct{}{}
+		}
+	}
+	return names
+}
+
+func jsonTagName(tag string) string {
 	name, _, _ := strings.Cut(tag, ",")
 	return name
 }

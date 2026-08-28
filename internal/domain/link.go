@@ -44,6 +44,12 @@ func New(rawOriginURL string) (Link, error) {
 	}, nil
 }
 
+// ValidateOriginURL checks whether rawOriginURL can be used as a link target.
+func ValidateOriginURL(rawOriginURL string) error {
+	_, err := parseOriginURL(rawOriginURL)
+	return err
+}
+
 func parseOriginURL(rawURL string) (url.URL, error) {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {
