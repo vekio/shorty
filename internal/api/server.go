@@ -2,6 +2,7 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/vekio/shorty/internal/app"
@@ -11,23 +12,23 @@ import (
 )
 
 // New builds the HTTP API and registers all routes.
-func New(application app.Application) *amigo.API {
+func New(application app.Application, logger *slog.Logger) *amigo.API {
 	endpoints := newHandlers(application)
-	api := amigo.New()
+	api := amigo.New(amigo.WithLogger(logger))
 	registerValidators(api)
-	links := api.Group("/links", logRequest)
+	links := api.Group("/links", logRequest(logger))
 	links.POST("", endpoints.CreateLink,
-		amigo.Status(http.StatusCreated),
-		amigo.MapError(domain.ErrOriginURLRequired, http.StatusBadRequest),
-		amigo.MapError(domain.ErrOriginURLInvalid, http.StatusBadRequest),
+		amigo.WithStatus(http.StatusCreated),
+		amigo.WithErrorMapping(domain.ErrOriginURLRequired, http.StatusBadRequest),
+		amigo.WithErrorMapping(domain.ErrOriginURLInvalid, http.StatusBadRequest),
 	)
 	links.GET("", endpoints.ListLinks)
 	links.GET("/{id}", endpoints.GetLink,
-		amigo.MapError(ports.ErrLinkNotFound, http.StatusNotFound),
+		amigo.WithErrorMapping(ports.ErrLinkNotFound, http.StatusNotFound),
 	)
 	links.POST("/{id}/visit", endpoints.VisitLink,
-		amigo.Status(http.StatusNoContent),
-		amigo.MapError(ports.ErrLinkNotFound, http.StatusNotFound),
+		amigo.WithStatus(http.StatusNoContent),
+		amigo.WithErrorMapping(ports.ErrLinkNotFound, http.StatusNotFound),
 	)
 	return api
 }

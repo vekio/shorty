@@ -6,9 +6,9 @@ import (
 	"testing"
 )
 
-func TestMapErrorAddsRouteMapping(t *testing.T) {
+func TestWithErrorMappingAddsRouteMapping(t *testing.T) {
 	target := errors.New("conflict")
-	route := newRoute(http.MethodPost, "/things", MapError(target, http.StatusConflict))
+	route := newRoute(http.MethodPost, "/things", WithErrorMapping(target, http.StatusConflict))
 
 	if len(route.errorMappings) != 1 || !errors.Is(route.errorMappings[0].target, target) || route.errorMappings[0].status != http.StatusConflict {
 		t.Errorf("errorMappings = %#v", route.errorMappings)
@@ -30,8 +30,8 @@ func TestRouteOptionsOverrideDefaults(t *testing.T) {
 	route := newRoute(
 		http.MethodPost,
 		"/things",
-		Status(http.StatusCreated),
-		MaxBodyBytes(512),
+		WithStatus(http.StatusCreated),
+		WithMaxBodyBytes(512),
 	)
 
 	if route.status != http.StatusCreated {
@@ -42,26 +42,26 @@ func TestRouteOptionsOverrideDefaults(t *testing.T) {
 	}
 }
 
-func TestUseAddsRouteMiddleware(t *testing.T) {
+func TestWithMiddlewareAddsRouteMiddleware(t *testing.T) {
 	middleware := func(next http.Handler) http.Handler { return next }
-	route := newRoute(http.MethodGet, "/things", Use(middleware))
+	route := newRoute(http.MethodGet, "/things", WithMiddleware(middleware))
 
 	if len(route.middlewares) != 1 {
 		t.Errorf("middlewares = %d, want %d", len(route.middlewares), 1)
 	}
 }
 
-func TestUseRejectsNilMiddleware(t *testing.T) {
+func TestWithMiddlewareRejectsNilMiddleware(t *testing.T) {
 	defer func() {
 		if recover() == nil {
-			t.Error("Use() did not panic")
+			t.Error("WithMiddleware() did not panic")
 		}
 	}()
 
-	_ = Use(nil)
+	_ = WithMiddleware(nil)
 }
 
-func TestMapErrorRejectsInvalidConfiguration(t *testing.T) {
+func TestWithErrorMappingRejectsInvalidConfiguration(t *testing.T) {
 	tests := []struct {
 		name   string
 		target error
@@ -76,24 +76,24 @@ func TestMapErrorRejectsInvalidConfiguration(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			defer func() {
 				if recover() == nil {
-					t.Error("MapError() did not panic")
+					t.Error("WithErrorMapping() did not panic")
 				}
 			}()
-			_ = MapError(test.target, test.status)
+			_ = WithErrorMapping(test.target, test.status)
 		})
 	}
 }
 
-func TestStatusRejectsNonSuccessStatus(t *testing.T) {
+func TestWithStatusRejectsNonSuccessStatus(t *testing.T) {
 	for _, status := range []int{http.StatusContinue, http.StatusMultipleChoices} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
-			assertPanics(t, func() { Status(status) })
+			assertPanics(t, func() { WithStatus(status) })
 		})
 	}
 }
 
-func TestMaxBodyBytesRejectsNegativeLimit(t *testing.T) {
-	assertPanics(t, func() { MaxBodyBytes(-1) })
+func TestWithMaxBodyBytesRejectsNegativeLimit(t *testing.T) {
+	assertPanics(t, func() { WithMaxBodyBytes(-1) })
 }
 
 func TestNewRouteRejectsNilOption(t *testing.T) {

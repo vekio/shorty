@@ -48,7 +48,7 @@ func TestRouterInheritsMiddlewareInHierarchyOrder(t *testing.T) {
 	child.GET("", func(context.Context, struct{}) (struct{}, error) {
 		order = append(order, "endpoint")
 		return struct{}{}, nil
-	}, Use(middleware("route")))
+	}, WithMiddleware(middleware("route")))
 
 	api.ServeHTTP(
 		httptest.NewRecorder(),

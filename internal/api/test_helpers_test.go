@@ -2,6 +2,8 @@ package api
 
 import (
 	"encoding/json/v2"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -27,7 +29,11 @@ func newTestAPI() http.Handler {
 			ListLinks: listlinks.NewListLinksHandler(repository),
 		},
 	}
-	return New(application)
+	return New(application, testLogger())
+}
+
+func testLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
 func createLink(t *testing.T, httpAPI http.Handler, originURL string) CreateLinkOutput {

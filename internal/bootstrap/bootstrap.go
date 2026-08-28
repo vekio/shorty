@@ -2,6 +2,8 @@
 package bootstrap
 
 import (
+	"log/slog"
+
 	"github.com/vekio/shorty/internal/app"
 	"github.com/vekio/shorty/internal/app/createlink"
 	"github.com/vekio/shorty/internal/app/getlink"
@@ -10,18 +12,25 @@ import (
 	"github.com/vekio/shorty/internal/app/visitlink"
 )
 
-type dependencies struct {
+// Dependencies contains the application services required by Shorty's
+// delivery layer.
+type Dependencies struct {
+	Application app.Application
+	Logger      *slog.Logger
+
 	linkRepo ports.LinkRepository
 }
 
-func New() app.Application {
-	deps := dependencies{
+func New() Dependencies {
+	deps := Dependencies{
+		Logger:   newLogger(),
 		linkRepo: newLinkRepository(),
 	}
-	return newApplication(deps)
+	deps.Application = newApplication(deps)
+	return deps
 }
 
-func newApplication(deps dependencies) app.Application {
+func newApplication(deps Dependencies) app.Application {
 	return app.Application{
 		Commands: app.Commands{
 			CreateLink: createlink.NewCreateLinkHandler(deps.linkRepo),

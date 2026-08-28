@@ -62,7 +62,7 @@ func (router *Router) RAW(method string, path string, endpoint RawEndpointFunc, 
 		panic("amigo: raw endpoint cannot be nil")
 	}
 	route := router.buildRoute(method, path, options...)
-	handler := applyMiddlewares(rawEndpointHandler(route, endpoint), route.middlewares)
+	handler := applyMiddlewares(rawEndpointHandler(router.api.logger, route, endpoint), route.middlewares)
 	router.api.mux.Handle(route.pattern(), handler)
 }
 
@@ -79,7 +79,7 @@ func (router *Router) registerEndpoint[In, Out any](
 	endpointRoute := router.buildRoute(method, path, options...)
 	input := buildInputMetadata[In](endpointRoute.path, router.api.validators)
 	output := buildOutputMetadata[Out]()
-	handler := endpointHandler(endpointRoute, input, output, endpoint)
+	handler := endpointHandler(router.api.logger, endpointRoute, input, output, endpoint)
 
 	router.api.mux.Handle(
 		endpointRoute.pattern(),

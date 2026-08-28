@@ -34,12 +34,12 @@ func (r route) resolveProblem(err error) *problem {
 	return newProblem(http.StatusInternalServerError, "internal server error")
 }
 
-func writeError(w http.ResponseWriter, request *http.Request, route route, err error) {
+func writeError(logger *slog.Logger, w http.ResponseWriter, request *http.Request, route route, err error) {
 	problem := route.resolveProblem(err)
 	problem.Instance = request.URL.Path
 
 	if problem.Status >= http.StatusInternalServerError {
-		slog.ErrorContext(request.Context(), "request failed",
+		logger.ErrorContext(request.Context(), "request failed",
 			"method", request.Method,
 			"path", request.URL.Path,
 			"error", err,

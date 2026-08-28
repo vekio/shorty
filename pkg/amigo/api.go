@@ -5,21 +5,32 @@
 // when direct access to net/http is required.
 package amigo
 
-import "net/http"
+import (
+	"log/slog"
+	"net/http"
+)
 
 // API owns the HTTP route tree and its underlying [http.ServeMux].
 // Routes should be registered during application startup.
 type API struct {
 	mux        *http.ServeMux
 	root       *Router
+	logger     *slog.Logger
 	validators validatorRegistry
 }
 
 // New creates an HTTP application with a root router.
-func New() *API {
+func New(options ...APIOption) *API {
 	api := &API{
 		mux:        http.NewServeMux(),
+		logger:     slog.Default(),
 		validators: newValidatorRegistry(),
+	}
+	for _, option := range options {
+		if option == nil {
+			panic("amigo: API option cannot be nil")
+		}
+		option(api)
 	}
 	api.root = newRouter(api, nil, "", nil)
 	return api

@@ -61,7 +61,7 @@ func TestListLinksReturnsCreatedLinks(t *testing.T) {
 func TestListLinksReturnsInternalError(t *testing.T) {
 	httpAPI := New(app.Application{
 		Queries: app.Queries{ListLinks: listLinksHandlerStub{err: errors.New("repository failed")}},
-	})
+	}, testLogger())
 	response := httptest.NewRecorder()
 	httpAPI.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/links", nil))
 

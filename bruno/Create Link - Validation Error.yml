@@ -1,0 +1,41 @@
+info:
+  name: Create Link - Validation Error
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{base_url}}/links"
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "origin_url": "not-a-url"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("returns a validation problem", function() {
+          expect(res.status).to.equal(422);
+          expect(res.getHeader("content-type")).to.include("application/problem+json");
+        });
+
+        test("locates the invalid URL", function() {
+          expect(res.body.errors).to.deep.include({
+            location: "body.origin_url",
+            message: "origin URL must be an absolute HTTP or HTTPS URL"
+          });
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

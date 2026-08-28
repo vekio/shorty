@@ -16,7 +16,7 @@ func TestRouteMapsHandlerError(t *testing.T) {
 		ID string `path:"id" json:"-"`
 	}) (struct{}, error) {
 		return struct{}{}, errors.Join(errors.New("repository"), target)
-	}, MapError(target, http.StatusNotFound))
+	}, WithErrorMapping(target, http.StatusNotFound))
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/things/42", nil)
@@ -33,7 +33,7 @@ func TestRouteLimitsRequestBody(t *testing.T) {
 		Name string `json:"name"`
 	}) (struct{}, error) {
 		return struct{}{}, nil
-	}, MaxBodyBytes(4))
+	}, WithMaxBodyBytes(4))
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/things", strings.NewReader(`{"name":"shorty"}`))
@@ -67,7 +67,7 @@ func TestRawEndpointMapsReturnedError(t *testing.T) {
 	api := New()
 	api.RAW(http.MethodGet, "/download", func(http.ResponseWriter, *http.Request) error {
 		return target
-	}, MapError(target, http.StatusServiceUnavailable))
+	}, WithErrorMapping(target, http.StatusServiceUnavailable))
 
 	response := httptest.NewRecorder()
 	api.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/download", nil))
@@ -112,7 +112,7 @@ func TestRouteMiddlewareWrapsTypedAndRawEndpoints(t *testing.T) {
 			register: func(api *API) {
 				api.GET("/things", func(context.Context, struct{}) (struct{}, error) {
 					return struct{}{}, nil
-				}, Use(markResponse))
+				}, WithMiddleware(markResponse))
 			},
 		},
 		{
@@ -121,7 +121,7 @@ func TestRouteMiddlewareWrapsTypedAndRawEndpoints(t *testing.T) {
 				api.RAW(http.MethodGet, "/things", func(w http.ResponseWriter, _ *http.Request) error {
 					w.WriteHeader(http.StatusNoContent)
 					return nil
-				}, Use(markResponse))
+				}, WithMiddleware(markResponse))
 			},
 		},
 	}

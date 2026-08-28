@@ -10,7 +10,11 @@ import (
 )
 
 func TestNewWiresHandlersToSharedRepository(t *testing.T) {
-	application := New()
+	deps := New()
+	application := deps.Application
+	if deps.Logger == nil {
+		t.Fatal("New() returned a nil logger")
+	}
 	if application.Commands.CreateLink == nil || application.Commands.VisitLink == nil || application.Queries.GetLink == nil || application.Queries.ListLinks == nil {
 		t.Fatal("New() returned an application with nil handlers")
 	}

@@ -2,6 +2,7 @@ package amigo
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 )
 
@@ -21,6 +22,7 @@ type EndpointFunc[In, Out any] func(context.Context, In) (Out, error)
 type RawEndpointFunc func(http.ResponseWriter, *http.Request) error
 
 func endpointHandler[In, Out any](
+	logger *slog.Logger,
 	route route,
 	inputMetadata inputMetadata,
 	outputMetadata outputMetadata,
@@ -31,31 +33,31 @@ func endpointHandler[In, Out any](
 
 		bound, err := bindInputWithPresence[In](request, inputMetadata)
 		if err != nil {
-			writeError(w, request, route, err)
+			writeError(logger, w, request, route, err)
 			return
 		}
 		if err := validateInput(bound.value, inputMetadata, bound.present); err != nil {
-			writeError(w, request, route, err)
+			writeError(logger, w, request, route, err)
 			return
 		}
 
 		output, err := endpoint(request.Context(), bound.value)
 		if err != nil {
-			writeError(w, request, route, err)
+			writeError(logger, w, request, route, err)
 			return
 		}
 
 		if err := writeOutput(w, route.status, output, outputMetadata); err != nil {
-			writeError(w, request, route, err)
+			writeError(logger, w, request, route, err)
 		}
 	}
 }
 
-func rawEndpointHandler(route route, endpoint RawEndpointFunc) http.HandlerFunc {
+func rawEndpointHandler(logger *slog.Logger, route route, endpoint RawEndpointFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, request *http.Request) {
 		limitRequestBody(w, request, route.maxBodyBytes)
 		if err := endpoint(w, request); err != nil {
-			writeError(w, request, route, err)
+			writeError(logger, w, request, route, err)
 		}
 	}
 }

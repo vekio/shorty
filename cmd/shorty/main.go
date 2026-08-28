@@ -1,8 +1,8 @@
 package main
 
 import (
-	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/vekio/shorty/internal/api"
@@ -10,8 +10,8 @@ import (
 )
 
 func main() {
-	application := bootstrap.New()
-	httpAPI := api.New(application)
+	deps := bootstrap.New()
+	httpAPI := api.New(deps.Application, deps.Logger)
 
 	server := &http.Server{
 		Addr:              ":8080",
@@ -22,6 +22,9 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	log.Printf("shorty listening on http://localhost%s", server.Addr)
-	log.Fatal(server.ListenAndServe())
+	deps.Logger.Info("shorty listening", "address", server.Addr)
+	if err := server.ListenAndServe(); err != nil {
+		deps.Logger.Error("HTTP server stopped", "error", err)
+		os.Exit(1)
+	}
 }
