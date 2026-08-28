@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// logRequest records one completion event after the endpoint and all inner
+// middleware have finished. Keeping it at the links router boundary makes the
+// log apply uniformly to every link endpoint.
 func logRequest(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {

@@ -1,11 +1,11 @@
-package api
+package links
 
 import (
 	"context"
-	"encoding/json/v2"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/vekio/shorty/internal/app"
@@ -27,10 +27,7 @@ func TestListLinksReturnsEmptyCollection(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusOK, response.Body.String())
 	}
-	var output ListLinksOutput
-	if err := json.Unmarshal(response.Body.Bytes(), &output); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	output := decodeResponse[ListLinksOutput](t, response)
 	if output.Links == nil || len(output.Links) != 0 {
 		t.Errorf("links = %#v, want non-nil empty collection", output.Links)
 	}
@@ -46,10 +43,7 @@ func TestListLinksReturnsCreatedLinks(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusOK, response.Body.String())
 	}
-	var output ListLinksOutput
-	if err := json.Unmarshal(response.Body.Bytes(), &output); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	output := decodeResponse[ListLinksOutput](t, response)
 	if len(output.Links) != 2 {
 		t.Fatalf("links length = %d, want 2", len(output.Links))
 	}
@@ -59,13 +53,14 @@ func TestListLinksReturnsCreatedLinks(t *testing.T) {
 }
 
 func TestListLinksReturnsInternalError(t *testing.T) {
-	httpAPI := New(app.Application{
+	httpAPI := newTestAPIWithApplication(app.Application{
 		Queries: app.Queries{ListLinks: listLinksHandlerStub{err: errors.New("repository failed")}},
-	}, testLogger())
+	})
 	response := httptest.NewRecorder()
 	httpAPI.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/links", nil))
 
-	if response.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusInternalServerError, response.Body.String())
+	problem := assertProblem(t, response, http.StatusInternalServerError, "internal server error", "/links")
+	if strings.Contains(response.Body.String(), "repository failed") || len(problem.Errors) != 0 {
+		t.Errorf("problem exposes private error information: %s", response.Body.String())
 	}
 }

@@ -1,4 +1,4 @@
-package api
+package links
 
 import (
 	"context"
@@ -6,7 +6,8 @@ import (
 	"github.com/vekio/shorty/internal/app/visitlink"
 )
 
-func (h *handlers) VisitLink(
+// VisitLink registers one visit and intentionally returns no representation.
+func (h *handler) VisitLink(
 	ctx context.Context,
 	input LinkByIDInput,
 ) (Empty, error) {

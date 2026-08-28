@@ -1,4 +1,6 @@
-package api
+// Package validator registers validation rules shared by Shorty's HTTP
+// resources.
+package validator
 
 import (
 	"strings"
@@ -9,7 +11,8 @@ import (
 
 const urlValidator = "url"
 
-func registerValidators(api *amigo.API) {
+// Register adds Shorty's shared request validators to api.
+func Register(api *amigo.API) {
 	api.Validator(urlValidator, validateURL)
 }
 

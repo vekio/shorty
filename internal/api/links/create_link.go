@@ -1,4 +1,4 @@
-package api
+package links
 
 import (
 	"context"
@@ -6,7 +6,9 @@ import (
 	"github.com/vekio/shorty/internal/app/createlink"
 )
 
-func (h *handlers) CreateLink(
+// CreateLink translates the HTTP input into the create-link command and maps
+// its result back to the public representation.
+func (h *handler) CreateLink(
 	ctx context.Context,
 	input CreateLinkInput,
 ) (CreateLinkOutput, error) {

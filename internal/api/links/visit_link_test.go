@@ -1,7 +1,6 @@
-package api
+package links
 
 import (
-	"encoding/json/v2"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -23,10 +22,7 @@ func TestVisitLinkRegistersVisit(t *testing.T) {
 
 	getResponse := httptest.NewRecorder()
 	httpAPI.ServeHTTP(getResponse, httptest.NewRequest(http.MethodGet, "/links/"+created.Code, nil))
-	var fetched LinkOutput
-	if err := json.Unmarshal(getResponse.Body.Bytes(), &fetched); err != nil {
-		t.Fatalf("decode get response: %v", err)
-	}
+	fetched := decodeResponse[LinkOutput](t, getResponse)
 	if fetched.Visits != 1 {
 		t.Errorf("visits = %d, want 1", fetched.Visits)
 	}
@@ -36,7 +32,5 @@ func TestVisitLinkMapsNotFoundError(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/links/missing/visit", nil)
 	response := httptest.NewRecorder()
 	newTestAPI().ServeHTTP(response, request)
-	if response.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusNotFound, response.Body.String())
-	}
+	assertProblem(t, response, http.StatusNotFound, "link not found", "/links/missing/visit")
 }

@@ -1,4 +1,4 @@
-package api
+package links
 
 import (
 	"context"
@@ -6,7 +6,8 @@ import (
 	"github.com/vekio/shorty/internal/app/getlink"
 )
 
-func (h *handlers) GetLink(
+// GetLink returns a link without changing its visit count.
+func (h *handler) GetLink(
 	ctx context.Context,
 	input LinkByIDInput,
 ) (LinkOutput, error) {

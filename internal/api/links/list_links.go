@@ -1,4 +1,4 @@
-package api
+package links
 
 import (
 	"context"
@@ -6,7 +6,8 @@ import (
 	"github.com/vekio/shorty/internal/app/listlinks"
 )
 
-func (h *handlers) ListLinks(
+// ListLinks returns the current link collection in application order.
+func (h *handler) ListLinks(
 	ctx context.Context,
 	_ Empty,
 ) (ListLinksOutput, error) {
