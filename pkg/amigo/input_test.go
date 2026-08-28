@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"uuid"
 )
 
 func TestBindInputDecodesJSON(t *testing.T) {
@@ -113,6 +114,56 @@ func TestBindInputBindsQueryAndHeaderParameters(t *testing.T) {
 	}
 }
 
+func TestBindInputBindsUUIDParameters(t *testing.T) {
+	pathID := uuid.MustParse("f81d4fae-7dec-11d0-a765-00a0c91e6bf6")
+	filterID := uuid.MustParse("01934c3e-7f5d-7cc8-9f23-8b6e4f61a245")
+	relatedID := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
+	requestID := uuid.MustParse("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+	type input struct {
+		ID        uuid.UUID   `path:"id" json:"-"`
+		Filter    uuid.UUID   `query:"filter" json:"-"`
+		Related   []uuid.UUID `query:"related" json:"-"`
+		RequestID uuid.UUID   `header:"X-Request-ID" json:"-"`
+	}
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/things/"+pathID.String()+"?filter="+filterID.String()+"&related="+pathID.String()+"&related="+relatedID.String(),
+		nil,
+	)
+	request.SetPathValue("id", pathID.String())
+	request.Header.Set("X-Request-ID", requestID.String())
+
+	got, err := bindInput[input](request, buildInputMetadata[input]("/things/{id}", newValidatorRegistry()))
+	if err != nil {
+		t.Fatalf("bindInput() error = %v", err)
+	}
+	want := input{
+		ID:        pathID,
+		Filter:    filterID,
+		Related:   []uuid.UUID{pathID, relatedID},
+		RequestID: requestID,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("input = %#v, want %#v", got, want)
+	}
+}
+
+func TestBindInputRejectsInvalidUUIDParameter(t *testing.T) {
+	type input struct {
+		ID uuid.UUID `query:"id" json:"-"`
+	}
+	request := httptest.NewRequest(http.MethodGet, "/things?id=not-a-uuid", nil)
+
+	_, err := bindInput[input](request, buildInputMetadata[input]("/things", newValidatorRegistry()))
+	problem, ok := errors.AsType[*problem](err)
+	if !ok {
+		t.Fatalf("error = %T, want *problem", err)
+	}
+	if problem.Status != http.StatusBadRequest || problem.Detail != `invalid query parameter "id"` {
+		t.Errorf("problem = %#v", problem)
+	}
+}
+
 func TestBindInputLeavesAbsentQueryAndHeaderParametersAtZeroValue(t *testing.T) {
 	type input struct {
 		Page    int  `query:"page" json:"-"`
@@ -126,6 +177,82 @@ func TestBindInputLeavesAbsentQueryAndHeaderParametersAtZeroValue(t *testing.T) 
 	}
 	if got.Page != 0 || got.Preview {
 		t.Errorf("input = %#v, want zero value", got)
+	}
+}
+
+func TestBindInputCollectsRepeatedQueryValuesIntoSlices(t *testing.T) {
+	type input struct {
+		Tags      []string `query:"tag" json:"-"`
+		Pages     []int    `query:"page" json:"-"`
+		Public    []bool   `query:"public" json:"-"`
+		Revisions []uint   `query:"revision" json:"-"`
+	}
+	request := httptest.NewRequest(
+		http.MethodGet,
+		"/things?tag=go&tag=http&page=-1&page=2&public=true&public=false&revision=1&revision=3",
+		nil,
+	)
+
+	got, err := bindInput[input](request, buildInputMetadata[input]("/things", newValidatorRegistry()))
+	if err != nil {
+		t.Fatalf("bindInput() error = %v", err)
+	}
+	want := input{
+		Tags:      []string{"go", "http"},
+		Pages:     []int{-1, 2},
+		Public:    []bool{true, false},
+		Revisions: []uint{1, 3},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("input = %#v, want %#v", got, want)
+	}
+}
+
+func TestBindInputDoesNotSplitCommaSeparatedQueryValues(t *testing.T) {
+	type input struct {
+		Tags []string `query:"tag" json:"-"`
+	}
+	request := httptest.NewRequest(http.MethodGet, "/things?tag=go,http", nil)
+
+	got, err := bindInput[input](request, buildInputMetadata[input]("/things", newValidatorRegistry()))
+	if err != nil {
+		t.Fatalf("bindInput() error = %v", err)
+	}
+	want := []string{"go,http"}
+	if !reflect.DeepEqual(got.Tags, want) {
+		t.Errorf("tags = %#v, want %#v", got.Tags, want)
+	}
+}
+
+func TestBindInputRejectsRepeatedScalarQueryParameter(t *testing.T) {
+	type input struct {
+		Tag string `query:"tag" json:"-"`
+	}
+	request := httptest.NewRequest(http.MethodGet, "/things?tag=go&tag=http", nil)
+
+	_, err := bindInput[input](request, buildInputMetadata[input]("/things", newValidatorRegistry()))
+	problem, ok := errors.AsType[*problem](err)
+	if !ok {
+		t.Fatalf("error = %T, want *problem", err)
+	}
+	if problem.Status != http.StatusBadRequest || problem.Detail != `query parameter "tag" must not be repeated` {
+		t.Errorf("problem = %#v", problem)
+	}
+}
+
+func TestBindInputRejectsInvalidQuerySliceElement(t *testing.T) {
+	type input struct {
+		Pages []int `query:"page" json:"-"`
+	}
+	request := httptest.NewRequest(http.MethodGet, "/things?page=1&page=many", nil)
+
+	_, err := bindInput[input](request, buildInputMetadata[input]("/things", newValidatorRegistry()))
+	problem, ok := errors.AsType[*problem](err)
+	if !ok {
+		t.Fatalf("error = %T, want *problem", err)
+	}
+	if problem.Status != http.StatusBadRequest || problem.Detail != `invalid query parameter "page"` {
+		t.Errorf("problem = %#v", problem)
 	}
 }
 
@@ -190,6 +317,12 @@ func TestSetParameterValueSupportsScalarTypes(t *testing.T) {
 		{name: "boolean", type_: reflect.TypeFor[bool](), value: "true", want: true},
 		{name: "signed integer", type_: reflect.TypeFor[int32](), value: "-42", want: int32(-42)},
 		{name: "unsigned integer", type_: reflect.TypeFor[uint16](), value: "42", want: uint16(42)},
+		{
+			name:  "UUID",
+			type_: reflect.TypeFor[uuid.UUID](),
+			value: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6",
+			want:  uuid.MustParse("f81d4fae-7dec-11d0-a765-00a0c91e6bf6"),
+		},
 	}
 
 	for _, test := range tests {

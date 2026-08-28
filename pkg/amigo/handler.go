@@ -12,7 +12,9 @@ import (
 // tagged with header become response headers; the remaining output is encoded
 // as JSON. Transport fields must also use json:"-" so metadata cannot leak into
 // JSON representations. Input fields may use validate:"required,name" to apply
-// the built-in presence check and validators registered on the API.
+// the built-in presence check and validators registered on the API. Query
+// slices collect repeated keys; scalar query fields reject repeated keys.
+// Parameter types implementing encoding.TextUnmarshaler are also supported.
 type EndpointFunc[In, Out any] func(context.Context, In) (Out, error)
 
 // RawEndpointFunc is the escape hatch for endpoints that need direct access to

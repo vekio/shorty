@@ -101,7 +101,23 @@ func TestBuildInputMetadataRejectsInvalidInput(t *testing.T) {
 			name: "unsupported query type",
 			build: func() {
 				buildInputMetadata[struct {
-					Filters []string `query:"filter" json:"-"`
+					Filters []float64 `query:"filter" json:"-"`
+				}]("/things", newValidatorRegistry())
+			},
+		},
+		{
+			name: "slice path parameter",
+			build: func() {
+				buildInputMetadata[struct {
+					IDs []int `path:"id" json:"-"`
+				}]("/things/{id}", newValidatorRegistry())
+			},
+		},
+		{
+			name: "slice header parameter",
+			build: func() {
+				buildInputMetadata[struct {
+					Values []string `header:"X-Value" json:"-"`
 				}]("/things", newValidatorRegistry())
 			},
 		},

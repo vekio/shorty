@@ -1,6 +1,7 @@
 package amigo
 
 import (
+	"encoding"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
@@ -131,10 +132,30 @@ func bindQueryParameters(
 		if !exists {
 			continue
 		}
-		if err := bindParameterValue(value, parameter, values[0], "query"); err != nil {
+		if err := bindQueryParameter(value, parameter, values); err != nil {
 			return err
 		}
 		present.add(parameter.fieldID)
+	}
+	return nil
+}
+
+func bindQueryParameter(value reflect.Value, parameter inputParameter, values []string) error {
+	field := value.FieldByIndex(parameter.fieldIndex)
+	if field.Kind() == reflect.Slice {
+		if err := setParameterSlice(field, values); err != nil {
+			return invalidParameterProblem("query", parameter.name)
+		}
+		return nil
+	}
+	if len(values) > 1 {
+		return newProblem(
+			http.StatusBadRequest,
+			fmt.Sprintf("query parameter %q must not be repeated", parameter.name),
+		)
+	}
+	if err := setParameterValue(field, values[0]); err != nil {
+		return invalidParameterProblem("query", parameter.name)
 	}
 	return nil
 }
@@ -161,12 +182,31 @@ func bindHeaderParameters(
 func bindParameterValue(value reflect.Value, parameter inputParameter, rawValue string, source string) error {
 	field := value.FieldByIndex(parameter.fieldIndex)
 	if err := setParameterValue(field, rawValue); err != nil {
-		return newProblem(http.StatusBadRequest, fmt.Sprintf("invalid %s parameter %q", source, parameter.name))
+		return invalidParameterProblem(source, parameter.name)
 	}
 	return nil
 }
 
+func invalidParameterProblem(source string, name string) *problem {
+	return newProblem(http.StatusBadRequest, fmt.Sprintf("invalid %s parameter %q", source, name))
+}
+
+func setParameterSlice(field reflect.Value, values []string) error {
+	result := reflect.MakeSlice(field.Type(), len(values), len(values))
+	for index, value := range values {
+		if err := setParameterValue(result.Index(index), value); err != nil {
+			return err
+		}
+	}
+	field.Set(result)
+	return nil
+}
+
 func setParameterValue(field reflect.Value, value string) error {
+	if unmarshaler, ok := field.Addr().Interface().(encoding.TextUnmarshaler); ok {
+		return unmarshaler.UnmarshalText([]byte(value))
+	}
+
 	switch field.Kind() {
 	case reflect.String:
 		field.SetString(value)

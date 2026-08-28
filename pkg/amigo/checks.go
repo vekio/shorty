@@ -1,11 +1,14 @@
 package amigo
 
 import (
+	"encoding"
 	"fmt"
 	"net/textproto"
 	"reflect"
 	"strings"
 )
+
+var textUnmarshalerType = reflect.TypeFor[encoding.TextUnmarshaler]()
 
 // Registration checks panic because malformed endpoint metadata is a
 // programming error rather than an invalid client request.
@@ -40,7 +43,7 @@ func checkPathField(
 	if _, exists := boundNames[name]; exists {
 		panic(fmt.Sprintf("amigo: path parameter %q is bound more than once", name))
 	}
-	if !supportsParameterType(field.Type) {
+	if !supportsScalarParameterType(field.Type) {
 		panic(fmt.Sprintf("amigo: path parameter %q has unsupported type %s", name, field.Type))
 	}
 	if jsonTagName(field.Tag.Get("json")) != "-" {
@@ -63,7 +66,7 @@ func checkInputParameterField(
 	if _, exists := boundNames[normalizedParameterName(source, name)]; exists {
 		panic(fmt.Sprintf("amigo: %s parameter %q is bound more than once", source, name))
 	}
-	if !supportsParameterType(field.Type) {
+	if !supportsInputParameterType(source, field.Type) {
 		panic(fmt.Sprintf("amigo: %s parameter %q has unsupported type %s", source, name, field.Type))
 	}
 	if jsonTagName(field.Tag.Get("json")) != "-" {
@@ -93,7 +96,17 @@ func checkOutputHeaderField(field reflect.StructField, name string) {
 	}
 }
 
-func supportsParameterType(valueType reflect.Type) bool {
+func supportsInputParameterType(source string, valueType reflect.Type) bool {
+	if source == "query" && valueType.Kind() == reflect.Slice {
+		return supportsScalarParameterType(valueType.Elem())
+	}
+	return supportsScalarParameterType(valueType)
+}
+
+func supportsScalarParameterType(valueType reflect.Type) bool {
+	if reflect.PointerTo(valueType).Implements(textUnmarshalerType) {
+		return true
+	}
 	switch valueType.Kind() {
 	case reflect.String, reflect.Bool,
 		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,

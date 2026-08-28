@@ -125,6 +125,50 @@ func TestOptionalValidatorSkipsMissingField(t *testing.T) {
 	}
 }
 
+func TestQuerySliceSupportsRequiredAndCustomValidation(t *testing.T) {
+	api := New()
+	api.Validator("multiple", func(values []string) error {
+		if len(values) < 2 {
+			return errors.New("must contain at least two values")
+		}
+		return nil
+	})
+	var received []string
+	api.GET("/things", func(_ context.Context, input struct {
+		Tags []string `query:"tag" json:"-" validate:"required,multiple"`
+	}) (struct{}, error) {
+		received = input.Tags
+		return struct{}{}, nil
+	})
+
+	tests := []struct {
+		name       string
+		target     string
+		wantStatus int
+	}{
+		{name: "missing", target: "/things", wantStatus: http.StatusUnprocessableEntity},
+		{name: "one value", target: "/things?tag=go", wantStatus: http.StatusUnprocessableEntity},
+		{name: "repeated values", target: "/things?tag=go&tag=http", wantStatus: http.StatusOK},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			received = nil
+			response := httptest.NewRecorder()
+			api.ServeHTTP(response, httptest.NewRequest(http.MethodGet, test.target, nil))
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body = %s", response.Code, test.wantStatus, response.Body.String())
+			}
+			if test.wantStatus == http.StatusOK {
+				want := []string{"go", "http"}
+				if !reflect.DeepEqual(received, want) {
+					t.Errorf("received = %#v, want %#v", received, want)
+				}
+			}
+		})
+	}
+}
+
 func TestRouteRejectsInvalidValidationTags(t *testing.T) {
 	tests := []struct {
 		name     string
