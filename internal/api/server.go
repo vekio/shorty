@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/vekio/amigo"
 	"github.com/vekio/shorty/internal/app"
 	"github.com/vekio/shorty/internal/app/ports"
 	"github.com/vekio/shorty/internal/domain"
-	"github.com/vekio/shorty/pkg/amigo"
 )
 
 // New builds the HTTP API and registers all routes.

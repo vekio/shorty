@@ -3,8 +3,8 @@ package api
 import (
 	"strings"
 
+	"github.com/vekio/amigo"
 	"github.com/vekio/shorty/internal/domain"
-	"github.com/vekio/shorty/pkg/amigo"
 )
 
 const urlValidator = "url"
