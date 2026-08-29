@@ -8,11 +8,11 @@ import (
 )
 
 type CreateLinkHandler struct {
-	repository ports.LinkRepository
+	repository ports.LinkSaver
 }
 
 func NewCreateLinkHandler(
-	repository ports.LinkRepository,
+	repository ports.LinkSaver,
 ) *CreateLinkHandler {
 	return &CreateLinkHandler{
 		repository: repository,

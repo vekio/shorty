@@ -22,7 +22,7 @@ runtime:
           expect(res.body.origin_url).to.equal("https://example.com/docs");
         });
 
-        test("returns the registered visit", function() {
+        test("returns the visit registered by the redirect", function() {
           expect(res.body.visits).to.equal(1);
         });
 

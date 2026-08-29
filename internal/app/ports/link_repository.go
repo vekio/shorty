@@ -8,11 +8,45 @@ import (
 	"github.com/vekio/shorty/internal/domain"
 )
 
+// ErrLinkNotFound indicates that no link exists for the requested code.
 var ErrLinkNotFound = errors.New("link not found")
 
-type LinkRepository interface {
+// LinkSaver persists a newly created link.
+type LinkSaver interface {
 	Save(context.Context, domain.Link) error
+}
+
+// LinkFinder retrieves one link by its public code.
+type LinkFinder interface {
 	FindByCode(context.Context, string) (domain.Link, error)
+}
+
+// LinkLister retrieves the complete link collection.
+type LinkLister interface {
 	FindAll(context.Context) ([]domain.Link, error)
+}
+
+// LinkVisitsUpdater persists a link whose visit count has changed.
+type LinkVisitsUpdater interface {
 	UpdateLinkVisits(context.Context, domain.Link) error
+}
+
+// LinkVisitor groups the capabilities needed to register a visit.
+type LinkVisitor interface {
+	LinkFinder
+	LinkVisitsUpdater
+}
+
+// LinkDeleter removes one link by its public code.
+type LinkDeleter interface {
+	Delete(context.Context, string) error
+}
+
+// LinkRepository is the complete persistence port used by bootstrap.
+type LinkRepository interface {
+	LinkSaver
+	LinkFinder
+	LinkLister
+	LinkVisitsUpdater
+	LinkDeleter
 }

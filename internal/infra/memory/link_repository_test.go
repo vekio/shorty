@@ -77,6 +77,30 @@ func TestUpdateLinkVisitsReturnsNotFound(t *testing.T) {
 	}
 }
 
+func TestDeleteRemovesLink(t *testing.T) {
+	repository := NewLinkRepository()
+	link, err := domain.New("https://example.com")
+	if err != nil {
+		t.Fatalf("create link: %v", err)
+	}
+	if err := repository.Save(t.Context(), link); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	if err := repository.Delete(t.Context(), link.Code()); err != nil {
+		t.Fatalf("Delete() error = %v", err)
+	}
+	if _, err := repository.FindByCode(t.Context(), link.Code()); !errors.Is(err, ports.ErrLinkNotFound) {
+		t.Errorf("FindByCode() error = %v after deletion, want %v", err, ports.ErrLinkNotFound)
+	}
+}
+
+func TestDeleteReturnsNotFound(t *testing.T) {
+	if err := NewLinkRepository().Delete(t.Context(), "missing"); !errors.Is(err, ports.ErrLinkNotFound) {
+		t.Errorf("Delete() error = %v, want %v", err, ports.ErrLinkNotFound)
+	}
+}
+
 func TestOperationsRespectCanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -97,6 +121,9 @@ func TestOperationsRespectCanceledContext(t *testing.T) {
 	}
 	if err := repository.UpdateLinkVisits(ctx, link); !errors.Is(err, context.Canceled) {
 		t.Errorf("UpdateLinkVisits() error = %v, want context canceled", err)
+	}
+	if err := repository.Delete(ctx, link.Code()); !errors.Is(err, context.Canceled) {
+		t.Errorf("Delete() error = %v, want context canceled", err)
 	}
 }
 

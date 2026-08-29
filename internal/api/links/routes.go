@@ -12,36 +12,43 @@ import (
 
 type handler struct {
 	createLink app.CreateLinkHandler
+	deleteLink app.DeleteLinkHandler
 	getLink    app.GetLinkHandler
 	listLinks  app.ListLinksHandler
-	visitLink  app.VisitLinkHandler
 }
 
 func newHandler(application app.Application) *handler {
 	return &handler{
 		createLink: application.Commands.CreateLink,
+		deleteLink: application.Commands.DeleteLink,
 		getLink:    application.Queries.GetLink,
 		listLinks:  application.Queries.ListLinks,
-		visitLink:  application.Commands.VisitLink,
 	}
 }
 
 // Register adds the link resource and its endpoints to api.
-func Register(api *amigo.API, application app.Application, middlewares ...amigo.Middleware) {
+func Register(router *amigo.Router, application app.Application) {
 	handler := newHandler(application)
-	router := api.Group("/links", middlewares...)
 
 	router.POST("", handler.CreateLink,
 		amigo.WithStatus(http.StatusCreated),
-		amigo.WithErrorMapping(domain.ErrOriginURLRequired, http.StatusBadRequest, "origin URL is required"),
-		amigo.WithErrorMapping(domain.ErrOriginURLInvalid, http.StatusBadRequest, "origin URL must be an absolute HTTP or HTTPS URL"),
+		amigo.WithErrorMapping(
+			domain.ErrOriginURLRequired,
+			http.StatusBadRequest, "origin URL is required"),
+		amigo.WithErrorMapping(
+			domain.ErrOriginURLInvalid,
+			http.StatusBadRequest, "origin URL must be an absolute HTTP or HTTPS URL"),
 	)
 	router.GET("", handler.ListLinks)
 	router.GET("/{id}", handler.GetLink,
-		amigo.WithErrorMapping(ports.ErrLinkNotFound, http.StatusNotFound, "link not found"),
+		amigo.WithErrorMapping(
+			ports.ErrLinkNotFound,
+			http.StatusNotFound, "link not found"),
 	)
-	router.POST("/{id}/visit", handler.VisitLink,
+	router.DELETE("/{id}", handler.DeleteLink,
 		amigo.WithStatus(http.StatusNoContent),
-		amigo.WithErrorMapping(ports.ErrLinkNotFound, http.StatusNotFound, "link not found"),
+		amigo.WithErrorMapping(
+			ports.ErrLinkNotFound,
+			http.StatusNotFound, "link not found"),
 	)
 }

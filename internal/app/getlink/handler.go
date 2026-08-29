@@ -7,10 +7,10 @@ import (
 )
 
 type GetLinkHandler struct {
-	repository ports.LinkRepository
+	repository ports.LinkFinder
 }
 
-func NewGetLinkHandler(repository ports.LinkRepository) *GetLinkHandler {
+func NewGetLinkHandler(repository ports.LinkFinder) *GetLinkHandler {
 	return &GetLinkHandler{repository: repository}
 }
 

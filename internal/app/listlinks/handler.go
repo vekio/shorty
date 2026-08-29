@@ -8,10 +8,10 @@ import (
 )
 
 type ListLinksHandler struct {
-	repository ports.LinkRepository
+	repository ports.LinkLister
 }
 
-func NewListLinksHandler(repository ports.LinkRepository) *ListLinksHandler {
+func NewListLinksHandler(repository ports.LinkLister) *ListLinksHandler {
 	return &ListLinksHandler{repository: repository}
 }
 

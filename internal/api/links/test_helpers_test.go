@@ -13,9 +13,9 @@ import (
 	apivalidator "github.com/vekio/shorty/internal/api/validator"
 	"github.com/vekio/shorty/internal/app"
 	"github.com/vekio/shorty/internal/app/createlink"
+	"github.com/vekio/shorty/internal/app/deletelink"
 	"github.com/vekio/shorty/internal/app/getlink"
 	"github.com/vekio/shorty/internal/app/listlinks"
-	"github.com/vekio/shorty/internal/app/visitlink"
 	"github.com/vekio/shorty/internal/infra/memory"
 )
 
@@ -41,7 +41,7 @@ func newTestApplication() app.Application {
 	return app.Application{
 		Commands: app.Commands{
 			CreateLink: createlink.NewCreateLinkHandler(repository),
-			VisitLink:  visitlink.NewVisitLinkHandler(repository),
+			DeleteLink: deletelink.NewDeleteLinkHandler(repository),
 		},
 		Queries: app.Queries{
 			GetLink:   getlink.NewGetLinkHandler(repository),
@@ -53,7 +53,7 @@ func newTestApplication() app.Application {
 func newTestAPIWithApplication(application app.Application) http.Handler {
 	httpAPI := amigo.New(amigo.WithLogger(testLogger()))
 	apivalidator.Register(httpAPI)
-	Register(httpAPI, application)
+	Register(httpAPI.Group("/links"), application)
 	return httpAPI
 }
 

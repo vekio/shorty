@@ -1,11 +1,11 @@
 info:
-  name: Visit Link
+  name: Delete Link
   type: http
-  seq: 2
+  seq: 6
 
 http:
-  method: POST
-  url: "{{base_url}}/links/:link_code/visit"
+  method: DELETE
+  url: "{{base_url}}/links/:link_code"
   params:
     - name: link_code
       value: "{{link_code}}"
@@ -16,8 +16,9 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("registers the visit without a response body", function() {
+        test("deletes the link without a response body", function() {
           expect(res.status).to.equal(204);
+          expect(res.body == null || res.body === "").to.equal(true);
         });
 
 settings:

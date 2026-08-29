@@ -73,3 +73,17 @@ func (repository *LinkRepository) UpdateLinkVisits(ctx context.Context, link dom
 	repository.links[link.Code()] = link
 	return nil
 }
+
+func (repository *LinkRepository) Delete(ctx context.Context, code string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	repository.mu.Lock()
+	defer repository.mu.Unlock()
+	if _, exists := repository.links[code]; !exists {
+		return ports.ErrLinkNotFound
+	}
+	delete(repository.links, code)
+	return nil
+}

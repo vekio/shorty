@@ -9,19 +9,19 @@ import (
 	apivalidator "github.com/vekio/shorty/internal/api/validator"
 )
 
-func TestRegisterAppliesMiddlewareToLinksRouter(t *testing.T) {
+func TestRegisterUsesConfiguredRouter(t *testing.T) {
 	httpAPI := amigo.New(amigo.WithLogger(testLogger()))
 	apivalidator.Register(httpAPI)
-	Register(httpAPI, newTestApplication(), func(next http.Handler) http.Handler {
+	router := httpAPI.Group("/links", func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 			w.Header().Set("X-Links-Middleware", "applied")
 			next.ServeHTTP(w, request)
 		})
 	})
+	Register(router, newTestApplication())
 
 	response := httptest.NewRecorder()
 	httpAPI.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/links", nil))
-
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusOK, response.Body.String())
 	}

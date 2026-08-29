@@ -4,9 +4,10 @@ import (
 	"testing"
 
 	"github.com/vekio/shorty/internal/app/createlink"
+	"github.com/vekio/shorty/internal/app/deletelink"
 	"github.com/vekio/shorty/internal/app/getlink"
 	"github.com/vekio/shorty/internal/app/listlinks"
-	"github.com/vekio/shorty/internal/app/visitlink"
+	"github.com/vekio/shorty/internal/app/resolvelink"
 )
 
 func TestNewWiresHandlersToSharedRepository(t *testing.T) {
@@ -15,7 +16,11 @@ func TestNewWiresHandlersToSharedRepository(t *testing.T) {
 	if deps.Logger == nil {
 		t.Fatal("New() returned a nil logger")
 	}
-	if application.Commands.CreateLink == nil || application.Commands.VisitLink == nil || application.Queries.GetLink == nil || application.Queries.ListLinks == nil {
+	if application.Commands.CreateLink == nil ||
+		application.Commands.DeleteLink == nil ||
+		application.Commands.ResolveLink == nil ||
+		application.Queries.GetLink == nil ||
+		application.Queries.ListLinks == nil {
 		t.Fatal("New() returned an application with nil handlers")
 	}
 
@@ -23,8 +28,12 @@ func TestNewWiresHandlersToSharedRepository(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create link: %v", err)
 	}
-	if _, err := application.Commands.VisitLink.Handle(t.Context(), visitlink.VisitLinkCommand{Code: created.Code}); err != nil {
-		t.Fatalf("visit link: %v", err)
+	resolved, err := application.Commands.ResolveLink.Handle(t.Context(), resolvelink.ResolveLinkCommand{Code: created.Code})
+	if err != nil {
+		t.Fatalf("resolve link: %v", err)
+	}
+	if resolved.OriginURL != "https://example.com" {
+		t.Errorf("resolved origin URL = %q, want https://example.com", resolved.OriginURL)
 	}
 	found, err := application.Queries.GetLink.Handle(t.Context(), getlink.GetLinkQuery{Code: created.Code})
 	if err != nil {
@@ -39,5 +48,11 @@ func TestNewWiresHandlersToSharedRepository(t *testing.T) {
 	}
 	if len(listed.Links) != 1 || listed.Links[0].Code != created.Code {
 		t.Errorf("listed = %#v, want created link", listed)
+	}
+	if _, err := application.Commands.DeleteLink.Handle(t.Context(), deletelink.DeleteLinkCommand{Code: created.Code}); err != nil {
+		t.Fatalf("delete link: %v", err)
+	}
+	if _, err := application.Queries.GetLink.Handle(t.Context(), getlink.GetLinkQuery{Code: created.Code}); err == nil {
+		t.Fatal("get deleted link returned nil error")
 	}
 }
