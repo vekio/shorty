@@ -124,7 +124,7 @@ func TestCreateLinkMapsApplicationErrorWithoutExposingItsCause(t *testing.T) {
 	assertProblem(
 		t,
 		response,
-		http.StatusBadRequest,
+		http.StatusUnprocessableEntity,
 		"origin URL must be an absolute HTTP or HTTPS URL",
 		"/links",
 	)

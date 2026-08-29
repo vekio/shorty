@@ -14,18 +14,9 @@ type repositoryStub struct {
 	findErr  error
 }
 
-func (*repositoryStub) Save(context.Context, domain.Link) error {
-	panic("Save must not be called by GetLink")
-}
 func (repository *repositoryStub) FindByCode(_ context.Context, code string) (domain.Link, error) {
 	repository.findCode = code
 	return repository.link, repository.findErr
-}
-func (*repositoryStub) FindAll(context.Context) ([]domain.Link, error) {
-	panic("FindAll must not be called by GetLink")
-}
-func (*repositoryStub) UpdateLinkVisits(context.Context, domain.Link) error {
-	panic("UpdateLinkVisits must not be called by GetLink")
 }
 
 func TestHandleReturnsLinkWithoutRegisteringVisit(t *testing.T) {

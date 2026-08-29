@@ -17,15 +17,6 @@ func (repository *repositoryStub) Save(_ context.Context, link domain.Link) erro
 	repository.saved = link
 	return repository.saveErr
 }
-func (*repositoryStub) FindByCode(context.Context, string) (domain.Link, error) {
-	panic("FindByCode must not be called by CreateLink")
-}
-func (*repositoryStub) FindAll(context.Context) ([]domain.Link, error) {
-	panic("FindAll must not be called by CreateLink")
-}
-func (*repositoryStub) UpdateLinkVisits(context.Context, domain.Link) error {
-	panic("UpdateLinkVisits must not be called by CreateLink")
-}
 
 func TestHandleCreatesAndSavesLink(t *testing.T) {
 	repository := &repositoryStub{}

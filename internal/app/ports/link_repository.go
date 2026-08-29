@@ -21,9 +21,15 @@ type LinkFinder interface {
 	FindByCode(context.Context, string) (domain.Link, error)
 }
 
-// LinkLister retrieves the complete link collection.
+// LinkLister retrieves creation-ordered pages of links.
 type LinkLister interface {
-	FindAll(context.Context) ([]domain.Link, error)
+	FindPage(ctx context.Context, limit int, offset int) (LinkPage, error)
+}
+
+// LinkPage contains one creation-ordered slice and the unfiltered total.
+type LinkPage struct {
+	Links []domain.Link
+	Total int
 }
 
 // LinkVisitsUpdater persists a link whose visit count has changed.

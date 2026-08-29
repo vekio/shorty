@@ -5,7 +5,14 @@ info:
 
 http:
   method: GET
-  url: "{{base_url}}/links"
+  url: "{{base_url}}/links?limit=20&offset=0"
+  params:
+    - name: limit
+      value: "20"
+      type: query
+    - name: offset
+      value: "0"
+      type: query
   auth: inherit
 
 runtime:
@@ -16,6 +23,9 @@ runtime:
           expect(res.status).to.equal(200);
           expect(res.body.links).to.be.an("array");
           expect(res.body.links.some(link => link.code === bru.getVar("link_code"))).to.equal(true);
+          expect(res.body.total).to.be.at.least(1);
+          expect(res.body.limit).to.equal(20);
+          expect(res.body.offset).to.equal(0);
         });
 
 settings:

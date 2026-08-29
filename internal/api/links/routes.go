@@ -6,6 +6,7 @@ import (
 
 	"github.com/vekio/amigo"
 	"github.com/vekio/shorty/internal/app"
+	"github.com/vekio/shorty/internal/app/listlinks"
 	"github.com/vekio/shorty/internal/app/ports"
 	"github.com/vekio/shorty/internal/domain"
 )
@@ -34,12 +35,17 @@ func Register(router *amigo.Router, application app.Application) {
 		amigo.WithStatus(http.StatusCreated),
 		amigo.WithErrorMapping(
 			domain.ErrOriginURLRequired,
-			http.StatusBadRequest, "origin URL is required"),
+			http.StatusUnprocessableEntity, "origin URL is required"),
 		amigo.WithErrorMapping(
 			domain.ErrOriginURLInvalid,
-			http.StatusBadRequest, "origin URL must be an absolute HTTP or HTTPS URL"),
+			http.StatusUnprocessableEntity, "origin URL must be an absolute HTTP or HTTPS URL"),
 	)
-	router.GET("", handler.ListLinks)
+	router.GET("", handler.ListLinks,
+		amigo.WithErrorMapping(listlinks.ErrInvalidLimit,
+			http.StatusBadRequest, listlinks.ErrInvalidLimit.Error()),
+		amigo.WithErrorMapping(listlinks.ErrInvalidOffset,
+			http.StatusBadRequest, listlinks.ErrInvalidOffset.Error()),
+	)
 	router.GET("/{id}", handler.GetLink,
 		amigo.WithErrorMapping(
 			ports.ErrLinkNotFound,

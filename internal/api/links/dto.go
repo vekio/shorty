@@ -29,7 +29,16 @@ type LinkOutput struct {
 	Visits    int       `json:"visits"`
 }
 
+// ListLinksInput binds optional pagination parameters from the query string.
+type ListLinksInput struct {
+	Limit  int `query:"limit" json:"-" validate:"page_limit"`
+	Offset int `query:"offset" json:"-" validate:"page_offset"`
+}
+
 // ListLinksOutput contains all links returned by the collection endpoint.
 type ListLinksOutput struct {
-	Links []LinkOutput `json:"links"`
+	Links  []LinkOutput `json:"links"`
+	Total  int          `json:"total"`
+	Limit  int          `json:"limit"`
+	Offset int          `json:"offset"`
 }
