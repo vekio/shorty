@@ -1,7 +1,7 @@
 info:
   name: Create Link - Validation Error
   type: http
-  seq: 5
+  seq: 6
 
 http:
   method: POST
@@ -9,6 +9,8 @@ http:
   headers:
     - name: Content-Type
       value: application/json
+    - name: X-Shorty-Owner
+      value: "{{session_id}}"
   body:
     type: json
     data: |-

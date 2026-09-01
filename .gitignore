@@ -9,6 +9,7 @@
 *.so
 *.dylib
 bin/
+.air/
 __debug_*
 
 # Test binary, built with `go test -c`

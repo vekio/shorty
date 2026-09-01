@@ -1,7 +1,8 @@
 package createlink
 
 type CreateLinkCommand struct {
-	URL string
+	OwnerID   string
+	OriginURL string
 }
 
 type CreateLinkResult struct {

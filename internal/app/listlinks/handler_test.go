@@ -10,14 +10,16 @@ import (
 )
 
 type repositoryStub struct {
-	page   ports.LinkPage
-	limit  int
-	offset int
-	calls  int
-	err    error
+	ownerID string
+	page    ports.LinkPage
+	limit   int
+	offset  int
+	calls   int
+	err     error
 }
 
-func (repository *repositoryStub) FindPage(_ context.Context, limit int, offset int) (ports.LinkPage, error) {
+func (repository *repositoryStub) FindPage(_ context.Context, ownerID string, limit int, offset int) (ports.LinkPage, error) {
+	repository.ownerID = ownerID
 	repository.limit = limit
 	repository.offset = offset
 	repository.calls++
@@ -25,7 +27,7 @@ func (repository *repositoryStub) FindPage(_ context.Context, limit int, offset 
 }
 
 func TestHandleReturnsRequestedPage(t *testing.T) {
-	link, err := domain.New("https://example.com/second")
+	link, err := domain.NewLink("https://example.com/second")
 	if err != nil {
 		t.Fatalf("create link: %v", err)
 	}
@@ -36,14 +38,18 @@ func TestHandleReturnsRequestedPage(t *testing.T) {
 	}}
 
 	result, err := NewListLinksHandler(repository).Handle(t.Context(), ListLinksQuery{
-		Limit:  1,
-		Offset: 1,
+		OwnerID: "browser-a",
+		Limit:   1,
+		Offset:  1,
 	})
 	if err != nil {
 		t.Fatalf("Handle() error = %v", err)
 	}
 	if repository.limit != 1 || repository.offset != 1 {
 		t.Errorf("FindPage() pagination = (%d, %d), want (1, 1)", repository.limit, repository.offset)
+	}
+	if repository.ownerID != "browser-a" {
+		t.Errorf("FindPage() owner = %q, want browser-a", repository.ownerID)
 	}
 	if result.Total != 2 || result.Limit != 1 || result.Offset != 1 {
 		t.Errorf("pagination = total %d, limit %d, offset %d", result.Total, result.Limit, result.Offset)

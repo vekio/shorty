@@ -17,7 +17,7 @@ func NewDeleteLinkHandler(repository ports.LinkDeleter) *DeleteLinkHandler {
 }
 
 func (h *DeleteLinkHandler) Handle(ctx context.Context, command DeleteLinkCommand) (DeleteLinkResult, error) {
-	if err := h.repository.Delete(ctx, command.Code); err != nil {
+	if err := h.repository.Delete(ctx, command.OwnerID, command.Code); err != nil {
 		return DeleteLinkResult{}, err
 	}
 	return DeleteLinkResult{}, nil

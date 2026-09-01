@@ -12,8 +12,9 @@ func (h *handler) ListLinks(
 	input ListLinksInput,
 ) (ListLinksOutput, error) {
 	result, err := h.listLinks.Handle(ctx, listlinks.ListLinksQuery{
-		Limit:  input.Limit,
-		Offset: input.Offset,
+		OwnerID: input.OwnerID,
+		Limit:   input.Limit,
+		Offset:  input.Offset,
 	})
 	if err != nil {
 		return ListLinksOutput{}, err

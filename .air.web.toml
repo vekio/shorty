@@ -1,0 +1,43 @@
+# Air configuration for the server-rendered Web development process.
+root = "."
+tmp_dir = ".air/web"
+
+[build]
+# Templates and CSS are embedded, so Tailwind must run before every Web build.
+pre_cmd = ["tailwindcss -i internal/web/styles/global.css -o internal/web/static/css/style.css --minify"]
+cmd = "go build -o ./.air/web/shorty-web ./cmd/web"
+bin = ".air/web/shorty-web"
+entrypoint = ["./.air/web/shorty-web"]
+include_dir = [
+  "cmd/web",
+  "internal/bootstrap",
+  "internal/config",
+  "internal/httpmiddleware",
+  "internal/web",
+  "pkg/shorty",
+]
+include_file = ["go.mod", "go.sum", "config-web.yml"]
+include_ext = ["go", "html", "css", "yml", "yaml"]
+exclude_dir = [".air", "bin", "vendor", "internal/web/static"]
+exclude_regex = ["_test\\.go"]
+exclude_unchanged = true
+delay = 300
+stop_on_error = true
+send_interrupt = true
+kill_delay = 500
+
+[log]
+time = false
+
+[misc]
+clean_on_exit = true
+
+[screen]
+clear_on_rebuild = false
+keep_scroll = true
+
+# Open port 3001 while Air proxies the application running on port 3000.
+[proxy]
+enabled = true
+proxy_port = 3001
+app_port = 3000

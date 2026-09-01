@@ -9,10 +9,11 @@ import (
 // GetLink returns a link without changing its visit count.
 func (h *handler) GetLink(
 	ctx context.Context,
-	input LinkByIDInput,
+	input LinkByCodeInput,
 ) (LinkOutput, error) {
 	result, err := h.getLink.Handle(ctx, getlink.GetLinkQuery{
-		Code: input.Code,
+		OwnerID: input.OwnerID,
+		Code:    input.Code,
 	})
 	if err != nil {
 		return LinkOutput{}, err

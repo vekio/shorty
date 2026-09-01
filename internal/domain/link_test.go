@@ -7,9 +7,9 @@ import (
 	"time"
 )
 
-func TestNewCreatesLink(t *testing.T) {
+func TestNewLinkCreatesLink(t *testing.T) {
 	before := time.Now().UTC()
-	link, err := New("  https://example.com/docs?q=go  ")
+	link, err := NewLink("  https://example.com/docs?q=go  ")
 	after := time.Now().UTC()
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
@@ -35,7 +35,7 @@ func TestNewCreatesLink(t *testing.T) {
 	}
 }
 
-func TestNewRejectsInvalidOriginURL(t *testing.T) {
+func TestNewLinkRejectsInvalidOriginURL(t *testing.T) {
 	tests := []struct {
 		name string
 		url  string
@@ -48,7 +48,7 @@ func TestNewRejectsInvalidOriginURL(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := New(test.url)
+			_, err := NewLink(test.url)
 			if !errors.Is(err, test.want) {
 				t.Errorf("New() error = %v, want %v", err, test.want)
 			}
@@ -65,8 +65,42 @@ func TestValidateOriginURL(t *testing.T) {
 	}
 }
 
+func TestDisallowOriginHostRejectsThisShortyInstance(t *testing.T) {
+	policy, err := DisallowOriginHost("https://sho.rt")
+	if err != nil {
+		t.Fatalf("DisallowOriginHost() error = %v", err)
+	}
+
+	for _, originURL := range []string{
+		"https://sho.rt",
+		"https://SHO.RT/r/already-shortened",
+	} {
+		_, err := NewLink(originURL, policy)
+		if !errors.Is(err, ErrOriginURLSelfReference) {
+			t.Errorf("NewLink(%q) error = %v, want %v", originURL, err, ErrOriginURLSelfReference)
+		}
+	}
+}
+
+func TestDisallowOriginHostAllowsAnotherAuthority(t *testing.T) {
+	policy, err := DisallowOriginHost("http://localhost:3000")
+	if err != nil {
+		t.Fatalf("DisallowOriginHost() error = %v", err)
+	}
+
+	if _, err := NewLink("http://localhost:8080/docs", policy); err != nil {
+		t.Errorf("NewLink() error = %v, want another port to be accepted", err)
+	}
+}
+
+func TestDisallowOriginHostRejectsInvalidPublicURL(t *testing.T) {
+	if _, err := DisallowOriginHost("/relative"); !errors.Is(err, ErrOriginURLInvalid) {
+		t.Errorf("DisallowOriginHost() error = %v, want wrapped %v", err, ErrOriginURLInvalid)
+	}
+}
+
 func TestRegisterVisitMutatesOnlyReceiver(t *testing.T) {
-	link, err := New("https://example.com")
+	link, err := NewLink("https://example.com")
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}

@@ -7,8 +7,11 @@ import (
 )
 
 // DeleteLink removes the link identified by the route path.
-func (h *handler) DeleteLink(ctx context.Context, input LinkByIDInput) (Empty, error) {
-	_, err := h.deleteLink.Handle(ctx, deletelink.DeleteLinkCommand{Code: input.Code})
+func (h *handler) DeleteLink(ctx context.Context, input LinkByCodeInput) (Empty, error) {
+	_, err := h.deleteLink.Handle(ctx, deletelink.DeleteLinkCommand{
+		OwnerID: input.OwnerID,
+		Code:    input.Code,
+	})
 	if err != nil {
 		return Empty{}, err
 	}

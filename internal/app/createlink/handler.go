@@ -8,23 +8,26 @@ import (
 )
 
 type CreateLinkHandler struct {
-	repository ports.LinkSaver
+	repository        ports.LinkSaver
+	originURLPolicies []domain.OriginURLPolicy
 }
 
 func NewCreateLinkHandler(
 	repository ports.LinkSaver,
+	originURLPolicies ...domain.OriginURLPolicy,
 ) *CreateLinkHandler {
 	return &CreateLinkHandler{
-		repository: repository,
+		repository:        repository,
+		originURLPolicies: originURLPolicies,
 	}
 }
 
 func (h *CreateLinkHandler) Handle(ctx context.Context, command CreateLinkCommand) (CreateLinkResult, error) {
-	link, err := domain.New(command.URL)
+	link, err := domain.NewLink(command.OriginURL, h.originURLPolicies...)
 	if err != nil {
 		return CreateLinkResult{}, err
 	}
-	if err := h.repository.Save(ctx, link); err != nil {
+	if err := h.repository.Save(ctx, command.OwnerID, link); err != nil {
 		return CreateLinkResult{}, err
 	}
 

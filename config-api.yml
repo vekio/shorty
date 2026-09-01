@@ -1,0 +1,6 @@
+address: :8080
+short_url: http://localhost:3000
+logger:
+  format: text
+  level: info
+  add_source: false

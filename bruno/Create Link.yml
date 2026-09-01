@@ -9,6 +9,8 @@ http:
   headers:
     - name: Content-Type
       value: application/json
+    - name: X-Shorty-Owner
+      value: "{{session_id}}"
   body:
     type: json
     data: |-

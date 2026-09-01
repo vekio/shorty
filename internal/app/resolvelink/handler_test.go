@@ -29,7 +29,7 @@ func (repository *repositoryStub) UpdateLinkVisits(_ context.Context, link domai
 }
 
 func TestHandleResolvesDestinationAndRegistersVisit(t *testing.T) {
-	link, err := domain.New("https://example.com/docs")
+	link, err := domain.NewLink("https://example.com/docs")
 	if err != nil {
 		t.Fatalf("create link: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestHandleReturnsFindErrorWithoutUpdating(t *testing.T) {
 }
 
 func TestHandleReturnsUpdateError(t *testing.T) {
-	link, err := domain.New("https://example.com")
+	link, err := domain.NewLink("https://example.com")
 	if err != nil {
 		t.Fatalf("create link: %v", err)
 	}

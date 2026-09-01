@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json/v2"
 	"io"
 	"log/slog"
@@ -11,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/vekio/shorty/internal/app"
-	"github.com/vekio/shorty/internal/app/resolvelink"
 )
 
 type routingProblem struct {
@@ -19,18 +17,6 @@ type routingProblem struct {
 	Status   int    `json:"status"`
 	Detail   string `json:"detail"`
 	Instance string `json:"instance"`
-}
-
-type resolveLinkHandlerStub struct {
-	code string
-}
-
-func (stub *resolveLinkHandlerStub) Handle(
-	_ context.Context,
-	command resolvelink.ResolveLinkCommand,
-) (resolvelink.ResolveLinkResult, error) {
-	stub.code = command.Code
-	return resolvelink.ResolveLinkResult{OriginURL: "https://example.com"}, nil
 }
 
 func newTestAPI() http.Handler {
@@ -63,26 +49,6 @@ func TestNewRegistersLinkRoutesAndSharedValidators(t *testing.T) {
 	newTestAPI().ServeHTTP(response, request)
 
 	assertRoutingProblem(t, response, http.StatusUnprocessableEntity, "request validation failed", "/links")
-}
-
-func TestNewRegistersRootRoutes(t *testing.T) {
-	resolveLink := &resolveLinkHandlerStub{}
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	httpAPI := New(app.Application{
-		Commands: app.Commands{ResolveLink: resolveLink},
-	}, logger)
-	response := httptest.NewRecorder()
-	httpAPI.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/abc123", nil))
-
-	if response.Code != http.StatusFound {
-		t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusFound, response.Body.String())
-	}
-	if resolveLink.code != "abc123" {
-		t.Errorf("resolved code = %q, want abc123", resolveLink.code)
-	}
-	if got := response.Header().Get("Location"); got != "https://example.com" {
-		t.Errorf("Location = %q, want https://example.com", got)
-	}
 }
 
 func assertRoutingProblem(

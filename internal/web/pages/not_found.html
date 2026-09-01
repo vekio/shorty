@@ -1,0 +1,23 @@
+{{define "not-found" -}}
+<section
+  class="mx-auto max-w-3xl rounded-3xl border border-line bg-surface/90 p-[clamp(1.5rem,6vw,4rem)] shadow-[0_1.25rem_3rem_rgb(35_42_37/7%)]"
+>
+  <p
+    class="mb-3 text-xs font-extrabold tracking-[.14em] text-accent-dark uppercase"
+  >
+    Error 404
+  </p>
+  <h1
+    class="mb-5 text-[clamp(2.5rem,7vw,5rem)] font-bold leading-none tracking-[-.055em]"
+  >
+    {{.Heading}}
+  </h1>
+  <p class="mb-8 text-lg leading-relaxed text-muted">{{.Detail}}</p>
+  <a
+    class="inline-flex min-h-12 items-center rounded-xl bg-ink px-5 font-bold text-white no-underline hover:bg-accent-dark"
+    href="/"
+  >
+    Back to Shorty
+  </a>
+</section>
+{{- end}}

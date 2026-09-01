@@ -4,8 +4,8 @@ info:
   seq: 2
 
 http:
-  method: GET
-  url: "{{base_url}}/:link_code"
+  method: POST
+  url: "{{base_url}}/links/:link_code/resolve"
   params:
     - name: link_code
       value: "{{link_code}}"
@@ -16,14 +16,14 @@ runtime:
   scripts:
     - type: tests
       code: |-
-        test("redirects to the origin URL", function() {
-          expect(res.status).to.equal(302);
-          expect(res.getHeader("location")).to.equal("https://example.com/docs");
+        test("resolves the origin URL and registers a visit", function() {
+          expect(res.status).to.equal(200);
+          expect(res.body.origin_url).to.equal("https://example.com/docs");
         });
 
 settings:
   encodeUrl: false
   timeout: 0
-  followRedirects: false
+  followRedirects: true
   maxRedirects: 5
   forwardAuthorizationHeader: false

@@ -2,7 +2,8 @@ package deletelink
 
 // DeleteLinkCommand identifies the link to remove.
 type DeleteLinkCommand struct {
-	Code string
+	OwnerID string
+	Code    string
 }
 
 // DeleteLinkResult represents a successful deletion without response data.

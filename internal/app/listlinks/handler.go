@@ -25,7 +25,7 @@ func (h *ListLinksHandler) Handle(ctx context.Context, query ListLinksQuery) (Li
 		return ListLinksResult{}, err
 	}
 
-	page, err := h.repository.FindPage(ctx, query.Limit, query.Offset)
+	page, err := h.repository.FindPage(ctx, query.OwnerID, query.Limit, query.Offset)
 	if err != nil {
 		return ListLinksResult{}, err
 	}

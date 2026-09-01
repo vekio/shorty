@@ -10,6 +10,9 @@ http:
     - name: link_code
       value: "{{link_code}}"
       type: path
+  headers:
+    - name: X-Shorty-Owner
+      value: "{{session_id}}"
   auth: inherit
 
 runtime:

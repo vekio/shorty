@@ -12,23 +12,28 @@ import (
 
 type LinkRepository struct {
 	mu    sync.RWMutex
-	links map[string]domain.Link
+	links map[string]ownedLink
+}
+
+type ownedLink struct {
+	ownerID string
+	link    domain.Link
 }
 
 var _ ports.LinkRepository = (*LinkRepository)(nil)
 
 func NewLinkRepository() *LinkRepository {
-	return &LinkRepository{links: make(map[string]domain.Link)}
+	return &LinkRepository{links: make(map[string]ownedLink)}
 }
 
-func (repository *LinkRepository) Save(ctx context.Context, link domain.Link) error {
+func (repository *LinkRepository) Save(ctx context.Context, ownerID string, link domain.Link) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
 	repository.mu.Lock()
 	defer repository.mu.Unlock()
-	repository.links[link.Code()] = link
+	repository.links[link.Code()] = ownedLink{ownerID: ownerID, link: link}
 	return nil
 }
 
@@ -39,14 +44,37 @@ func (repository *LinkRepository) FindByCode(ctx context.Context, code string) (
 
 	repository.mu.RLock()
 	defer repository.mu.RUnlock()
-	link, exists := repository.links[code]
+	stored, exists := repository.links[code]
 	if !exists {
 		return domain.Link{}, ports.ErrLinkNotFound
 	}
-	return link, nil
+	return stored.link, nil
 }
 
-func (repository *LinkRepository) FindPage(ctx context.Context, limit int, offset int) (ports.LinkPage, error) {
+func (repository *LinkRepository) FindOwnedByCode(
+	ctx context.Context,
+	ownerID string,
+	code string,
+) (domain.Link, error) {
+	if err := ctx.Err(); err != nil {
+		return domain.Link{}, err
+	}
+
+	repository.mu.RLock()
+	defer repository.mu.RUnlock()
+	stored, exists := repository.links[code]
+	if !exists || stored.ownerID != ownerID {
+		return domain.Link{}, ports.ErrLinkNotFound
+	}
+	return stored.link, nil
+}
+
+func (repository *LinkRepository) FindPage(
+	ctx context.Context,
+	ownerID string,
+	limit int,
+	offset int,
+) (ports.LinkPage, error) {
 	if err := ctx.Err(); err != nil {
 		return ports.LinkPage{}, err
 	}
@@ -54,14 +82,16 @@ func (repository *LinkRepository) FindPage(ctx context.Context, limit int, offse
 	repository.mu.RLock()
 	defer repository.mu.RUnlock()
 	links := make([]domain.Link, 0, len(repository.links))
-	for _, link := range repository.links {
-		links = append(links, link)
+	for _, stored := range repository.links {
+		if stored.ownerID == ownerID {
+			links = append(links, stored.link)
+		}
 	}
 	sort.Slice(links, func(i, j int) bool {
 		if links[i].CreatedAt().Equal(links[j].CreatedAt()) {
-			return links[i].Code() < links[j].Code()
+			return links[i].Code() > links[j].Code()
 		}
-		return links[i].CreatedAt().Before(links[j].CreatedAt())
+		return links[i].CreatedAt().After(links[j].CreatedAt())
 	})
 
 	total := len(links)
@@ -80,22 +110,24 @@ func (repository *LinkRepository) UpdateLinkVisits(ctx context.Context, link dom
 
 	repository.mu.Lock()
 	defer repository.mu.Unlock()
-	_, exists := repository.links[link.Code()]
+	stored, exists := repository.links[link.Code()]
 	if !exists {
 		return ports.ErrLinkNotFound
 	}
-	repository.links[link.Code()] = link
+	stored.link = link
+	repository.links[link.Code()] = stored
 	return nil
 }
 
-func (repository *LinkRepository) Delete(ctx context.Context, code string) error {
+func (repository *LinkRepository) Delete(ctx context.Context, ownerID string, code string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
 	repository.mu.Lock()
 	defer repository.mu.Unlock()
-	if _, exists := repository.links[code]; !exists {
+	stored, exists := repository.links[code]
+	if !exists || stored.ownerID != ownerID {
 		return ports.ErrLinkNotFound
 	}
 	delete(repository.links, code)

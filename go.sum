@@ -1,2 +1,8 @@
-github.com/vekio/amigo v0.2.4 h1:H0oR0Q/zt+qbB6Grt+6N4LE/DPSGjpCY0729SUG1NPc=
-github.com/vekio/amigo v0.2.4/go.mod h1:D4LC1urwKuE655n4xMU/VrE4kxYSKMpLHTrk67ID/34=
+github.com/vekio/amigo v0.2.7 h1:BVGdSrMK3STYd0w7mvTrx44ZCkTNlI5YxBfcfgpCZhI=
+github.com/vekio/amigo v0.2.7/go.mod h1:D4LC1urwKuE655n4xMU/VrE4kxYSKMpLHTrk67ID/34=
+github.com/vekio/config v0.4.0 h1:C39Trpc0Uvp2jlcsHN1fqiwR6kcwNfAFHErQBJ/iGn4=
+github.com/vekio/config v0.4.0/go.mod h1:bHmC0k3yokE1llI7gbRciZmoUPpSGIeFFRQczwPqQog=
+github.com/vekio/x v0.0.1 h1:lzFwlM0bbuhAgWMKdytFkX7S9JVEM2b94JZlmHI7UV0=
+github.com/vekio/x v0.0.1/go.mod h1:C1/qVGQF0d3ObOQIn7JVI8ECQP3okrfjNQLnjQ8ZHuo=
+go.yaml.in/yaml/v4 v4.0.0-rc.6 h1:1h7H1ohdUh93/FyE4YaDa1Zh64K6VVbjF4K6WUxMtH4=
+go.yaml.in/yaml/v4 v4.0.0-rc.6/go.mod h1:aZqd9kCMsGL7AuUv/m/PvWLdg5sjJsZ4oHDEnfPPfY0=

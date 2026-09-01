@@ -13,9 +13,13 @@ import (
 const codeBytes = 9
 
 var (
-	ErrOriginURLRequired = errors.New("origin URL is required")
-	ErrOriginURLInvalid  = errors.New("origin URL must be an absolute HTTP or HTTPS URL")
+	ErrOriginURLRequired      = errors.New("origin URL is required")
+	ErrOriginURLInvalid       = errors.New("origin URL must be an absolute HTTP or HTTPS URL")
+	ErrOriginURLSelfReference = errors.New("origin URL cannot point to this Shorty instance")
 )
+
+// OriginURLPolicy applies a configurable business rule to a parsed origin URL.
+type OriginURLPolicy func(url.URL) error
 
 // Link is the shortened representation of an absolute HTTP(S) URL.
 type Link struct {
@@ -25,11 +29,19 @@ type Link struct {
 	visits    int
 }
 
-// New creates a Link with a URL-safe, cryptographically random code.
-func New(rawOriginURL string) (Link, error) {
+// NewLink creates a Link with a URL-safe, cryptographically random code.
+func NewLink(rawOriginURL string, policies ...OriginURLPolicy) (Link, error) {
 	originURL, err := parseOriginURL(rawOriginURL)
 	if err != nil {
 		return Link{}, err
+	}
+	for _, policy := range policies {
+		if policy == nil {
+			continue
+		}
+		if err := policy(originURL); err != nil {
+			return Link{}, err
+		}
 	}
 
 	code, err := generateCode()
@@ -41,6 +53,21 @@ func New(rawOriginURL string) (Link, error) {
 		code:      code,
 		originURL: originURL,
 		createdAt: time.Now().UTC(),
+	}, nil
+}
+
+// DisallowOriginHost creates a policy that rejects links targeting the public
+// authority used by this Shorty instance, regardless of their path.
+func DisallowOriginHost(rawPublicURL string) (OriginURLPolicy, error) {
+	publicURL, err := parseOriginURL(rawPublicURL)
+	if err != nil {
+		return nil, fmt.Errorf("parse Shorty public URL: %w", err)
+	}
+	return func(originURL url.URL) error {
+		if strings.EqualFold(originURL.Host, publicURL.Host) {
+			return ErrOriginURLSelfReference
+		}
+		return nil
 	}, nil
 }
 

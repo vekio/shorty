@@ -12,18 +12,20 @@ import (
 )
 
 type handler struct {
-	createLink app.CreateLinkHandler
-	deleteLink app.DeleteLinkHandler
-	getLink    app.GetLinkHandler
-	listLinks  app.ListLinksHandler
+	createLink  app.CreateLinkHandler
+	deleteLink  app.DeleteLinkHandler
+	resolveLink app.ResolveLinkHandler
+	getLink     app.GetLinkHandler
+	listLinks   app.ListLinksHandler
 }
 
 func newHandler(application app.Application) *handler {
 	return &handler{
-		createLink: application.Commands.CreateLink,
-		deleteLink: application.Commands.DeleteLink,
-		getLink:    application.Queries.GetLink,
-		listLinks:  application.Queries.ListLinks,
+		createLink:  application.Commands.CreateLink,
+		deleteLink:  application.Commands.DeleteLink,
+		resolveLink: application.Commands.ResolveLink,
+		getLink:     application.Queries.GetLink,
+		listLinks:   application.Queries.ListLinks,
 	}
 }
 
@@ -39,6 +41,9 @@ func Register(router *amigo.Router, application app.Application) {
 		amigo.WithErrorMapping(
 			domain.ErrOriginURLInvalid,
 			http.StatusUnprocessableEntity, "origin URL must be an absolute HTTP or HTTPS URL"),
+		amigo.WithErrorMapping(
+			domain.ErrOriginURLSelfReference,
+			http.StatusUnprocessableEntity, "origin URL cannot point to this Shorty instance"),
 	)
 	router.GET("", handler.ListLinks,
 		amigo.WithErrorMapping(listlinks.ErrInvalidLimit,
@@ -46,12 +51,17 @@ func Register(router *amigo.Router, application app.Application) {
 		amigo.WithErrorMapping(listlinks.ErrInvalidOffset,
 			http.StatusBadRequest, listlinks.ErrInvalidOffset.Error()),
 	)
-	router.GET("/{id}", handler.GetLink,
+	router.GET("/{code}", handler.GetLink,
 		amigo.WithErrorMapping(
 			ports.ErrLinkNotFound,
 			http.StatusNotFound, "link not found"),
 	)
-	router.DELETE("/{id}", handler.DeleteLink,
+	router.POST("/{code}/resolve", handler.ResolveLink,
+		amigo.WithErrorMapping(
+			ports.ErrLinkNotFound,
+			http.StatusNotFound, "link not found"),
+	)
+	router.DELETE("/{code}", handler.DeleteLink,
 		amigo.WithStatus(http.StatusNoContent),
 		amigo.WithErrorMapping(
 			ports.ErrLinkNotFound,

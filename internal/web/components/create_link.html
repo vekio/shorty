@@ -1,0 +1,65 @@
+{{define "create-link" -}}
+<section
+  class="grid gap-6 rounded-3xl border border-line bg-surface/90 p-[clamp(1.25rem,4vw,2.5rem)] shadow-[0_1.25rem_3rem_rgb(35_42_37/7%)]"
+  aria-labelledby="create-title"
+>
+  <div>
+    <p
+      class="mb-2.5 text-xs font-extrabold tracking-[.14em] text-accent-dark uppercase"
+    >
+      New link
+    </p>
+    <h2
+      id="create-title"
+      class="text-[clamp(1.6rem,4vw,2.3rem)] font-bold tracking-[-.035em]"
+    >
+      What should we shorten?
+    </h2>
+  </div>
+
+  {{if .CreatedURL}}
+  <div
+    class="rounded-xl bg-green-100 px-4 py-3 font-semibold text-success"
+    role="status"
+  >
+    Created <a href="{{.CreatedURL}}">{{.CreatedURL}}</a>
+  </div>
+  {{end}} {{if .FormError}}
+  <div
+    class="rounded-xl bg-red-100 px-4 py-3 font-semibold text-error"
+    role="alert"
+  >
+    {{.FormError}}
+  </div>
+  {{end}}
+
+  <form
+    hx-post="/links?limit={{.Limit}}&amp;offset={{.Offset}}"
+    hx-target="#workspace"
+    hx-swap="outerHTML"
+    hx-disabled-elt="find button"
+  >
+    <label for="origin_url" class="mb-2.5 block text-sm font-bold"
+      >Destination URL</label
+    >
+    <div class="flex gap-3 max-[42rem]:flex-col">
+      <input
+        id="origin_url"
+        name="origin_url"
+        type="url"
+        value="{{.OriginURL}}"
+        placeholder="https://example.com/a/very/long/path"
+        autocomplete="url"
+        class="min-h-13 min-w-0 flex-1 rounded-xl border border-line bg-white px-4 text-ink outline-none focus:border-accent focus:ring-3 focus:ring-accent/20"
+        required
+      />
+      <button
+        type="submit"
+        class="min-h-13 cursor-pointer rounded-xl bg-ink px-6 font-bold text-white hover:bg-accent-dark disabled:cursor-wait disabled:opacity-60"
+      >
+        Shorten
+      </button>
+    </div>
+  </form>
+</section>
+{{- end}}

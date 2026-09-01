@@ -12,7 +12,10 @@ func (h *handler) CreateLink(
 	ctx context.Context,
 	input CreateLinkInput,
 ) (CreateLinkOutput, error) {
-	result, err := h.createLink.Handle(ctx, createlink.CreateLinkCommand{URL: input.OriginURL})
+	result, err := h.createLink.Handle(ctx, createlink.CreateLinkCommand{
+		OwnerID:   input.OwnerID,
+		OriginURL: input.OriginURL,
+	})
 	if err != nil {
 		return CreateLinkOutput{}, err
 	}
