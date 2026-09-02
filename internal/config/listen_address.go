@@ -1,5 +1,3 @@
-// Package config defines configuration components shared by Shorty's
-// independent processes.
 package config
 
 import (
@@ -9,8 +7,6 @@ import (
 	"strings"
 )
 
-// ValidateListenAddress checks a TCP address accepted by http.Server without
-// resolving its host or opening the listener.
 func ValidateListenAddress(address string) error {
 	if address == "" || strings.TrimSpace(address) != address {
 		return fmt.Errorf("address must be a non-empty TCP host:port")

@@ -58,25 +58,6 @@ func TestListLinksReturnsCreatedLinks(t *testing.T) {
 	}
 }
 
-func TestListLinksOnlyReturnsCurrentOwnersLinks(t *testing.T) {
-	httpAPI := newTestAPI()
-	createLinkForOwner(t, httpAPI, "browser-a", "https://example.com/a")
-	createLinkForOwner(t, httpAPI, "browser-b", "https://example.com/b")
-
-	request := httptest.NewRequest(http.MethodGet, "/links", nil)
-	request.Header.Set("X-Shorty-Owner", "browser-b")
-	response := httptest.NewRecorder()
-	httpAPI.ServeHTTP(response, request)
-
-	if response.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusOK, response.Body.String())
-	}
-	output := decodeResponse[ListLinksOutput](t, response)
-	if output.Total != 1 || len(output.Links) != 1 || output.Links[0].OriginURL != "https://example.com/b" {
-		t.Errorf("output = %#v, want only browser-b link", output)
-	}
-}
-
 func TestListLinksReturnsRequestedPage(t *testing.T) {
 	httpAPI := newTestAPI()
 	createLink(t, httpAPI, "https://example.com/first")

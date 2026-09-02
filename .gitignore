@@ -21,6 +21,11 @@ coverage.*
 *.coverprofile
 profile.cov
 
+# Local SQLite databases
+*.db
+*.db-shm
+*.db-wal
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 

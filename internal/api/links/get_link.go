@@ -12,8 +12,7 @@ func (h *handler) GetLink(
 	input LinkByCodeInput,
 ) (LinkOutput, error) {
 	result, err := h.getLink.Handle(ctx, getlink.GetLinkQuery{
-		OwnerID: input.OwnerID,
-		Code:    input.Code,
+		Code: input.Code,
 	})
 	if err != nil {
 		return LinkOutput{}, err

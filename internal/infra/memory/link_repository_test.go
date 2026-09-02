@@ -9,8 +9,6 @@ import (
 	"github.com/vekio/shorty/internal/domain"
 )
 
-const testOwnerID = "browser-a"
-
 func TestSaveAndFindByCode(t *testing.T) {
 	repository := NewLinkRepository()
 	link, err := domain.NewLink("https://example.com/docs")
@@ -18,7 +16,7 @@ func TestSaveAndFindByCode(t *testing.T) {
 		t.Fatalf("create link: %v", err)
 	}
 
-	if err := repository.Save(t.Context(), testOwnerID, link); err != nil {
+	if err := repository.Save(t.Context(), link); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
 	got, err := repository.FindByCode(t.Context(), link.Code())
@@ -39,34 +37,6 @@ func TestFindByCodeReturnsNotFound(t *testing.T) {
 	}
 }
 
-func TestOwnedOperationsDoNotExposeAnotherOwnersLink(t *testing.T) {
-	repository := NewLinkRepository()
-	link, err := domain.NewLink("https://example.com/private")
-	if err != nil {
-		t.Fatalf("create link: %v", err)
-	}
-	if err := repository.Save(t.Context(), "browser-a", link); err != nil {
-		t.Fatalf("Save() error = %v", err)
-	}
-
-	if _, err := repository.FindOwnedByCode(t.Context(), "browser-b", link.Code()); !errors.Is(err, ports.ErrLinkNotFound) {
-		t.Errorf("FindOwnedByCode() error = %v, want %v", err, ports.ErrLinkNotFound)
-	}
-	page, err := repository.FindPage(t.Context(), "browser-b", 20, 0)
-	if err != nil {
-		t.Fatalf("FindPage() error = %v", err)
-	}
-	if page.Total != 0 || len(page.Links) != 0 {
-		t.Errorf("FindPage() = %#v, want empty page", page)
-	}
-	if err := repository.Delete(t.Context(), "browser-b", link.Code()); !errors.Is(err, ports.ErrLinkNotFound) {
-		t.Errorf("Delete() error = %v, want %v", err, ports.ErrLinkNotFound)
-	}
-	if _, err := repository.FindByCode(t.Context(), link.Code()); err != nil {
-		t.Errorf("public FindByCode() after rejected delete error = %v", err)
-	}
-}
-
 func TestFindPageReturnsRequestedNewestFirstPage(t *testing.T) {
 	repository := NewLinkRepository()
 	first, err := domain.NewLink("https://example.com/first")
@@ -77,14 +47,14 @@ func TestFindPageReturnsRequestedNewestFirstPage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create second link: %v", err)
 	}
-	if err := repository.Save(t.Context(), testOwnerID, first); err != nil {
+	if err := repository.Save(t.Context(), first); err != nil {
 		t.Fatalf("save first link: %v", err)
 	}
-	if err := repository.Save(t.Context(), testOwnerID, second); err != nil {
+	if err := repository.Save(t.Context(), second); err != nil {
 		t.Fatalf("save second link: %v", err)
 	}
 
-	page, err := repository.FindPage(t.Context(), testOwnerID, 1, 1)
+	page, err := repository.FindPage(t.Context(), 1, 1)
 	if err != nil {
 		t.Fatalf("FindPage() error = %v", err)
 	}
@@ -95,7 +65,7 @@ func TestFindPageReturnsRequestedNewestFirstPage(t *testing.T) {
 		t.Errorf("FindPage() links = %#v, want oldest link on second page", page.Links)
 	}
 
-	empty, err := repository.FindPage(t.Context(), testOwnerID, 1, 10)
+	empty, err := repository.FindPage(t.Context(), 1, 10)
 	if err != nil {
 		t.Fatalf("FindPage() beyond total error = %v", err)
 	}
@@ -104,13 +74,9 @@ func TestFindPageReturnsRequestedNewestFirstPage(t *testing.T) {
 	}
 }
 
-func TestUpdateLinkVisitsReturnsNotFound(t *testing.T) {
-	link, err := domain.NewLink("https://example.com")
-	if err != nil {
-		t.Fatalf("create link: %v", err)
-	}
-	if err := NewLinkRepository().UpdateLinkVisits(t.Context(), link); !errors.Is(err, ports.ErrLinkNotFound) {
-		t.Errorf("UpdateLinkVisits() error = %v, want %v", err, ports.ErrLinkNotFound)
+func TestResolveByCodeReturnsNotFound(t *testing.T) {
+	if _, err := NewLinkRepository().ResolveByCode(t.Context(), "missing"); !errors.Is(err, ports.ErrLinkNotFound) {
+		t.Errorf("ResolveByCode() error = %v, want %v", err, ports.ErrLinkNotFound)
 	}
 }
 
@@ -120,11 +86,11 @@ func TestDeleteRemovesLink(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create link: %v", err)
 	}
-	if err := repository.Save(t.Context(), testOwnerID, link); err != nil {
+	if err := repository.Save(t.Context(), link); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
 
-	if err := repository.Delete(t.Context(), testOwnerID, link.Code()); err != nil {
+	if err := repository.Delete(t.Context(), link.Code()); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
 	if _, err := repository.FindByCode(t.Context(), link.Code()); !errors.Is(err, ports.ErrLinkNotFound) {
@@ -133,7 +99,7 @@ func TestDeleteRemovesLink(t *testing.T) {
 }
 
 func TestDeleteReturnsNotFound(t *testing.T) {
-	if err := NewLinkRepository().Delete(t.Context(), testOwnerID, "missing"); !errors.Is(err, ports.ErrLinkNotFound) {
+	if err := NewLinkRepository().Delete(t.Context(), "missing"); !errors.Is(err, ports.ErrLinkNotFound) {
 		t.Errorf("Delete() error = %v, want %v", err, ports.ErrLinkNotFound)
 	}
 }
@@ -147,55 +113,76 @@ func TestOperationsRespectCanceledContext(t *testing.T) {
 		t.Fatalf("create link: %v", err)
 	}
 
-	if err := repository.Save(ctx, testOwnerID, link); !errors.Is(err, context.Canceled) {
+	if err := repository.Save(ctx, link); !errors.Is(err, context.Canceled) {
 		t.Errorf("Save() error = %v, want context canceled", err)
 	}
 	if _, err := repository.FindByCode(ctx, link.Code()); !errors.Is(err, context.Canceled) {
 		t.Errorf("FindByCode() error = %v, want context canceled", err)
 	}
-	if _, err := repository.FindPage(ctx, testOwnerID, 20, 0); !errors.Is(err, context.Canceled) {
+	if _, err := repository.FindPage(ctx, 20, 0); !errors.Is(err, context.Canceled) {
 		t.Errorf("FindPage() error = %v, want context canceled", err)
 	}
-	if err := repository.UpdateLinkVisits(ctx, link); !errors.Is(err, context.Canceled) {
-		t.Errorf("UpdateLinkVisits() error = %v, want context canceled", err)
+	if _, err := repository.ResolveByCode(ctx, link.Code()); !errors.Is(err, context.Canceled) {
+		t.Errorf("ResolveByCode() error = %v, want context canceled", err)
 	}
-	if err := repository.Delete(ctx, testOwnerID, link.Code()); !errors.Is(err, context.Canceled) {
+	if err := repository.Delete(ctx, link.Code()); !errors.Is(err, context.Canceled) {
 		t.Errorf("Delete() error = %v, want context canceled", err)
 	}
 }
 
-func TestLinkValuesMustBeSavedAfterMutation(t *testing.T) {
+func TestResolveByCodeAtomicallyRegistersVisit(t *testing.T) {
 	repository := NewLinkRepository()
 	link, err := domain.NewLink("https://example.com/docs")
 	if err != nil {
 		t.Fatalf("create link: %v", err)
 	}
-	if err := repository.Save(t.Context(), testOwnerID, link); err != nil {
+	if err := repository.Save(t.Context(), link); err != nil {
 		t.Fatalf("save link: %v", err)
 	}
 
-	stored, err := repository.FindByCode(t.Context(), link.Code())
+	resolved, err := repository.ResolveByCode(t.Context(), link.Code())
 	if err != nil {
-		t.Fatalf("find link: %v", err)
-	}
-	stored.RegisterVisit()
-
-	unchanged, err := repository.FindByCode(t.Context(), link.Code())
-	if err != nil {
-		t.Fatalf("find unchanged link: %v", err)
-	}
-	if unchanged.Visits() != 0 {
-		t.Fatalf("stored visits = %d before saving the changed value, want 0", unchanged.Visits())
-	}
-
-	if err := repository.UpdateLinkVisits(t.Context(), stored); err != nil {
-		t.Fatalf("save changed link: %v", err)
+		t.Fatalf("ResolveByCode() error = %v", err)
 	}
 	updated, err := repository.FindByCode(t.Context(), link.Code())
 	if err != nil {
 		t.Fatalf("find updated link: %v", err)
 	}
-	if updated.Visits() != 1 {
-		t.Errorf("stored visits = %d, want 1", updated.Visits())
+	if resolved.Visits() != 1 || updated.Visits() != 1 {
+		t.Errorf("resolved visits = %d, stored visits = %d, want 1", resolved.Visits(), updated.Visits())
+	}
+}
+
+func TestUpdateLinkOriginPreservesVisitsRegisteredAfterRead(t *testing.T) {
+	repository := NewLinkRepository()
+	link, err := domain.NewLink("https://example.com/old")
+	if err != nil {
+		t.Fatalf("create link: %v", err)
+	}
+	if err := repository.Save(t.Context(), link); err != nil {
+		t.Fatalf("save link: %v", err)
+	}
+
+	stale, err := repository.FindByCode(t.Context(), link.Code())
+	if err != nil {
+		t.Fatalf("find link before visit: %v", err)
+	}
+	if _, err := repository.ResolveByCode(t.Context(), link.Code()); err != nil {
+		t.Fatalf("resolve link: %v", err)
+	}
+	if err := stale.ChangeOriginURL("https://example.com/new"); err != nil {
+		t.Fatalf("change origin URL: %v", err)
+	}
+	if err := repository.UpdateLinkOrigin(t.Context(), stale); err != nil {
+		t.Fatalf("update link origin: %v", err)
+	}
+
+	stored, err := repository.FindByCode(t.Context(), link.Code())
+	if err != nil {
+		t.Fatalf("find updated link: %v", err)
+	}
+	storedURL := stored.OriginURL()
+	if storedURL.String() != "https://example.com/new" || stored.Visits() != 1 {
+		t.Errorf("stored link = %#v, want updated URL and one visit", stored)
 	}
 }

@@ -22,7 +22,6 @@ func TestRegisterUsesConfiguredRouter(t *testing.T) {
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/links", nil)
-	request.Header.Set("X-Shorty-Owner", "browser-a")
 	httpAPI.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body = %s", response.Code, http.StatusOK, response.Body.String())

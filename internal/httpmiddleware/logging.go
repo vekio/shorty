@@ -1,5 +1,4 @@
-// Package httpmiddleware contains transport middleware shared by Shorty's
-// independent HTTP servers.
+// Package httpmiddleware contains Shorty's HTTP transport middleware.
 package httpmiddleware
 
 import (

@@ -113,3 +113,58 @@ func TestRegisterVisitMutatesOnlyReceiver(t *testing.T) {
 		t.Errorf("original Visits() = %d, want 0", link.Visits())
 	}
 }
+
+func TestRestoreLinkRehydratesPersistedState(t *testing.T) {
+	createdAt := time.Date(2026, time.September, 1, 9, 30, 0, 0, time.FixedZone("test", 2*60*60))
+	link, err := RestoreLink("abc123", "https://example.com/docs", createdAt, 7)
+	if err != nil {
+		t.Fatalf("RestoreLink() error = %v", err)
+	}
+	if link.Code() != "abc123" || link.Visits() != 7 || !link.CreatedAt().Equal(createdAt) {
+		t.Errorf("RestoreLink() = %#v", link)
+	}
+	if link.CreatedAt().Location() != time.UTC {
+		t.Errorf("CreatedAt() location = %v, want UTC", link.CreatedAt().Location())
+	}
+}
+
+func TestRestoreLinkRejectsInvalidPersistedState(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		code      string
+		originURL string
+		createdAt time.Time
+		visits    int
+	}{
+		{name: "code", originURL: "https://example.com", createdAt: time.Now()},
+		{name: "origin URL", code: "abc", originURL: "invalid", createdAt: time.Now()},
+		{name: "creation time", code: "abc", originURL: "https://example.com"},
+		{name: "visits", code: "abc", originURL: "https://example.com", createdAt: time.Now(), visits: -1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := RestoreLink(test.code, test.originURL, test.createdAt, test.visits); err == nil {
+				t.Fatal("RestoreLink() returned nil error")
+			}
+		})
+	}
+}
+
+func TestChangeOriginURLAppliesValidationAndPolicies(t *testing.T) {
+	link, err := NewLink("https://example.com/old")
+	if err != nil {
+		t.Fatalf("NewLink() error = %v", err)
+	}
+	policy, err := DisallowOriginHost("https://sho.rt")
+	if err != nil {
+		t.Fatalf("DisallowOriginHost() error = %v", err)
+	}
+	if err := link.ChangeOriginURL("https://example.com/new", policy); err != nil {
+		t.Fatalf("ChangeOriginURL() error = %v", err)
+	}
+	if originURL := link.OriginURL(); originURL.String() != "https://example.com/new" {
+		t.Errorf("OriginURL() = %q", originURL.String())
+	}
+	if err := link.ChangeOriginURL("https://sho.rt/r/existing", policy); !errors.Is(err, ErrOriginURLSelfReference) {
+		t.Errorf("ChangeOriginURL() error = %v, want %v", err, ErrOriginURLSelfReference)
+	}
+}

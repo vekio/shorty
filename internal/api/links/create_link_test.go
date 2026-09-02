@@ -37,8 +37,8 @@ func TestCreateLink(t *testing.T) {
 	if output.Code == "" {
 		t.Error("response code is empty")
 	}
-	if got := response.Header().Get("Location"); got != "/links/"+output.Code {
-		t.Errorf("Location = %q, want %q", got, "/links/"+output.Code)
+	if got := response.Header().Get("Location"); got != "/api/v1/links/"+output.Code {
+		t.Errorf("Location = %q, want %q", got, "/api/v1/links/"+output.Code)
 	}
 }
 

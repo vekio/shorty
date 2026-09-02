@@ -13,7 +13,6 @@ func (h *handler) CreateLink(
 	input CreateLinkInput,
 ) (CreateLinkOutput, error) {
 	result, err := h.createLink.Handle(ctx, createlink.CreateLinkCommand{
-		OwnerID:   input.OwnerID,
 		OriginURL: input.OriginURL,
 	})
 	if err != nil {
@@ -21,7 +20,7 @@ func (h *handler) CreateLink(
 	}
 
 	return CreateLinkOutput{
-		Location: "/links/" + result.Code,
+		Location: "/api/v1/links/" + result.Code,
 		Code:     result.Code,
 	}, nil
 }

@@ -1,0 +1,29 @@
+info:
+  name: Navigate Link
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{base_url}}/r/:link_code"
+  params:
+    - name: link_code
+      value: "{{link_code}}"
+      type: path
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("redirects navigation to the link destination", function() {
+          expect(res.status).to.equal(302);
+          expect(res.getHeader("location")).to.be.a("string").and.not.be.empty;
+        });
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: false
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

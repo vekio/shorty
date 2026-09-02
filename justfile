@@ -1,13 +1,7 @@
 build_dir := "bin"
-api_binary_name := "shorty-api"
-api_main_package := "./cmd/api"
-web_binary_name := "shorty-web"
-web_main_package := "./cmd/web"
-local_api_config := justfile_directory() + "/config-api.yml"
-local_web_config := justfile_directory() + "/config-web.yml"
-tailwind_input := "internal/web/styles/global.css"
-tailwind_output_dir := "internal/web/static/css"
-tailwind_output := "internal/web/static/css/style.css"
+binary_name := "shorty"
+main_package := "./cmd/shorty"
+local_config := justfile_directory() + "/config.yml"
 
 # List available recipes
 [group('help')]
@@ -35,9 +29,9 @@ coverage:
 mod-tidy-check:
     go mod tidy -diff
 
-# Run all repository quality checks
+# Run all repository quality checks after regenerating database code
 [group('quality')]
-check: fmt-check mod-tidy-check vet test
+check: sqlc fmt-check mod-tidy-check vet test
 
 # Format Go code
 [group('quality')]
@@ -49,61 +43,38 @@ fmt:
 fmt-check:
     @files="$(gofmt -l $(rg --files -g '*.go'))"; if [ -n "$files" ]; then printf '%s\n' "$files"; exit 1; fi
 
-# Run go vet
+# Run Go's static analysis
 [group('quality')]
 vet:
     go vet ./...
 
-# Remove build artifacts
+# Generate database code, run checks, and compile the single binary
 [group('artifacts')]
-clean:
-    rm -rf {{ build_dir }}
-
-# Compile Tailwind and the project binaries into ./bin
-[group('artifacts')]
-build: css check
+build: check
     mkdir -p {{ build_dir }}
-    go build -o {{ build_dir }}/{{ api_binary_name }} {{ api_main_package }}
-    go build -o {{ build_dir }}/{{ web_binary_name }} {{ web_main_package }}
+    go build -o {{ build_dir }}/{{ binary_name }} {{ main_package }}
 
-# Install the API and Web binaries into GOPATH/bin or GOBIN
+# Generate database code, run checks, and install the single binary
 [group('artifacts')]
-install: css check
-    go install {{ api_main_package }}
-    go install {{ web_main_package }}
+install: check
+    go install {{ main_package }}
 
-# Run the JSON API using its configuration file
+# Generate database code and run Shorty using the local configuration
 [group('development')]
-api:
-    SHORTY_API_CONFIG_FILE="{{ local_api_config }}" go run {{ api_main_package }}
+run: sqlc
+    SHORTY_CONFIG_FILE="{{ local_config }}" go run {{ main_package }}
 
-# Run the server-rendered Web application using its configuration file
+# Generate database code and run Shorty with automatic rebuilds
 [group('development')]
-web: css
-    SHORTY_WEB_CONFIG_FILE="{{ local_web_config }}" go run {{ web_main_package }}
+dev: sqlc
+    SHORTY_CONFIG_FILE="{{ local_config }}" air -c .air.toml
 
-# Run API and Web together with automatic rebuilds
-[group('development')]
-[parallel]
-dev: api-watch web-watch
+# Generate the type-safe SQLite access layer from schema and queries
+[group('database')]
+sqlc:
+    sqlc generate
 
-# Rebuild and restart the JSON API when its source or configuration changes
-[group('development')]
-api-watch:
-    SHORTY_API_CONFIG_FILE="{{ local_api_config }}" air -c .air.api.toml
-
-# Rebuild Web and Tailwind, then reload the browser through localhost:3001
-[group('development')]
-web-watch:
-    SHORTY_WEB_CONFIG_FILE="{{ local_web_config }}" air -c .air.web.toml
-
-# Compile the minified Tailwind stylesheet used by the embedded Web UI
-[group('styles')]
-css:
-    mkdir -p {{ tailwind_output_dir }}
-    tailwindcss -i {{ tailwind_input }} -o {{ tailwind_output }} --minify
-
-# Recompile Tailwind whenever templates or source styles change
-[group('styles')]
-css-watch:
-    tailwindcss -i {{ tailwind_input }} -o {{ tailwind_output }} --watch
+# Create a new timestamped SQL migration: just migration add_something
+[group('database')]
+migration name:
+    goose -dir internal/infra/sqlite/migrations create "{{ name }}" sql

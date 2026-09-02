@@ -7,13 +7,11 @@ import (
 )
 
 type repositoryStub struct {
-	ownerID     string
 	deletedCode string
 	err         error
 }
 
-func (repository *repositoryStub) Delete(_ context.Context, ownerID string, code string) error {
-	repository.ownerID = ownerID
+func (repository *repositoryStub) Delete(_ context.Context, code string) error {
 	repository.deletedCode = code
 	return repository.err
 }
@@ -21,17 +19,13 @@ func (repository *repositoryStub) Delete(_ context.Context, ownerID string, code
 func TestHandleDeletesLinkByCode(t *testing.T) {
 	repository := &repositoryStub{}
 	_, err := NewDeleteLinkHandler(repository).Handle(t.Context(), DeleteLinkCommand{
-		OwnerID: "browser-a",
-		Code:    "abc123",
+		Code: "abc123",
 	})
 	if err != nil {
 		t.Fatalf("Handle() error = %v", err)
 	}
 	if repository.deletedCode != "abc123" {
 		t.Errorf("Delete() code = %q, want abc123", repository.deletedCode)
-	}
-	if repository.ownerID != "browser-a" {
-		t.Errorf("Delete() owner = %q, want browser-a", repository.ownerID)
 	}
 }
 

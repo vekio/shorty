@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-// ValidateHTTPURL checks a public base URL used by a Shorty process.
 func ValidateHTTPURL(name string, rawURL string) error {
 	if rawURL == "" || strings.TrimSpace(rawURL) != rawURL {
 		return fmt.Errorf("%s must be a non-empty absolute URL", name)

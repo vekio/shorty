@@ -1,6 +1,7 @@
 [tools]
 go = "1.27.0"
 "go:github.com/air-verse/air" = "latest"
+sqlc = "latest"
+"go:github.com/pressly/goose/v3/cmd/goose" = "latest"
 "go:golang.org/x/tools/gopls" = "latest"
 "go:github.com/go-delve/delve/cmd/dlv" = "latest"
-"github:tailwindlabs/tailwindcss" = "latest"

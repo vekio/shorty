@@ -1,0 +1,12 @@
+info:
+  name: API
+  type: folder
+  seq: 1
+
+request:
+  auth:
+    type: bearer
+    token: "{{api_key}}"
+
+docs: |-
+  Management API. Every request in this folder inherits the Bearer API key.

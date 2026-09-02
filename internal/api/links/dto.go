@@ -5,20 +5,13 @@ import "time"
 // Empty represents an endpoint without request or response fields.
 type Empty struct{}
 
-// LinkByCodeInput binds an owned link code from the route path.
+// LinkByCodeInput binds a link code from the route path.
 type LinkByCodeInput struct {
-	OwnerID string `header:"X-Shorty-Owner" json:"-" validate:"required"`
-	Code    string `path:"code" json:"-"`
-}
-
-// ResolveLinkInput identifies a public link without requiring ownership.
-type ResolveLinkInput struct {
 	Code string `path:"code" json:"-"`
 }
 
 // CreateLinkInput is the JSON representation accepted when creating a link.
 type CreateLinkInput struct {
-	OwnerID   string `header:"X-Shorty-Owner" json:"-" validate:"required"`
 	OriginURL string `json:"origin_url" validate:"required,url"`
 }
 
@@ -26,6 +19,12 @@ type CreateLinkInput struct {
 type CreateLinkOutput struct {
 	Location string `header:"Location" json:"-"`
 	Code     string `json:"code"`
+}
+
+// UpdateLinkInput binds a link code and its replacement destination.
+type UpdateLinkInput struct {
+	Code      string `path:"code" json:"-"`
+	OriginURL string `json:"origin_url" validate:"required,url"`
 }
 
 // LinkOutput is the public representation of a shortened link.
@@ -36,16 +35,10 @@ type LinkOutput struct {
 	Visits    int       `json:"visits"`
 }
 
-// ResolveLinkOutput returns the destination selected by a resolution command.
-type ResolveLinkOutput struct {
-	OriginURL string `json:"origin_url"`
-}
-
 // ListLinksInput binds optional pagination parameters from the query string.
 type ListLinksInput struct {
-	OwnerID string `header:"X-Shorty-Owner" json:"-" validate:"required"`
-	Limit   int    `query:"limit" json:"-" validate:"page_limit"`
-	Offset  int    `query:"offset" json:"-" validate:"page_offset"`
+	Limit  int `query:"limit" json:"-" validate:"page_limit"`
+	Offset int `query:"offset" json:"-" validate:"page_offset"`
 }
 
 // ListLinksOutput contains all links returned by the collection endpoint.

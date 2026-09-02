@@ -1,0 +1,38 @@
+info:
+  name: Update Link
+  type: http
+  seq: 5
+
+http:
+  method: PATCH
+  url: "{{base_url}}/api/v1/links/:link_code"
+  headers:
+    - name: Content-Type
+      value: application/json
+  params:
+    - name: link_code
+      value: "{{link_code}}"
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "origin_url": "https://example.com/updated"
+      }
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("updates the destination", function() {
+          expect(res.status).to.equal(200);
+          expect(res.body.origin_url).to.equal("https://example.com/updated");
+        });
+
+settings:
+  encodeUrl: false
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

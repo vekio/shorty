@@ -1,0 +1,11 @@
+info:
+  name: Admin
+  type: folder
+  seq: 3
+
+request:
+  auth:
+    type: none
+
+docs: |-
+  Server-rendered administration interface.

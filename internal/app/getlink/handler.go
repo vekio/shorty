@@ -7,15 +7,15 @@ import (
 )
 
 type GetLinkHandler struct {
-	repository ports.OwnedLinkFinder
+	repository ports.LinkFinder
 }
 
-func NewGetLinkHandler(repository ports.OwnedLinkFinder) *GetLinkHandler {
+func NewGetLinkHandler(repository ports.LinkFinder) *GetLinkHandler {
 	return &GetLinkHandler{repository: repository}
 }
 
 func (h *GetLinkHandler) Handle(ctx context.Context, query GetLinkQuery) (GetLinkResult, error) {
-	link, err := h.repository.FindOwnedByCode(ctx, query.OwnerID, query.Code)
+	link, err := h.repository.FindByCode(ctx, query.Code)
 	if err != nil {
 		return GetLinkResult{}, err
 	}

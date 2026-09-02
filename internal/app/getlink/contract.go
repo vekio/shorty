@@ -3,8 +3,7 @@ package getlink
 import "time"
 
 type GetLinkQuery struct {
-	OwnerID string
-	Code    string
+	Code string
 }
 
 type GetLinkResult struct {

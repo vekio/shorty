@@ -6,7 +6,6 @@ import (
 
 	"github.com/vekio/amigo"
 	"github.com/vekio/shorty/internal/api/links"
-	"github.com/vekio/shorty/internal/api/resolve"
 	"github.com/vekio/shorty/internal/api/validator"
 	"github.com/vekio/shorty/internal/app"
 )
@@ -17,7 +16,6 @@ func New(application app.Application, logger *slog.Logger) *amigo.API {
 	validator.Register(httpAPI)
 
 	links.Register(httpAPI.Group("/links"), application)
-	resolve.Register(httpAPI.Group("/r"), application)
 
 	return httpAPI
 }

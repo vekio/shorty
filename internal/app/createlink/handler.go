@@ -27,7 +27,7 @@ func (h *CreateLinkHandler) Handle(ctx context.Context, command CreateLinkComman
 	if err != nil {
 		return CreateLinkResult{}, err
 	}
-	if err := h.repository.Save(ctx, command.OwnerID, link); err != nil {
+	if err := h.repository.Save(ctx, link); err != nil {
 		return CreateLinkResult{}, err
 	}
 

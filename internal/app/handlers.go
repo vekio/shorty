@@ -8,6 +8,7 @@ import (
 	"github.com/vekio/shorty/internal/app/getlink"
 	"github.com/vekio/shorty/internal/app/listlinks"
 	"github.com/vekio/shorty/internal/app/resolvelink"
+	"github.com/vekio/shorty/internal/app/updatelink"
 )
 
 // CreateLinkHandler is the create-link command capability exposed to input
@@ -26,6 +27,11 @@ type ResolveLinkHandler interface {
 // adapters.
 type DeleteLinkHandler interface {
 	Handle(context.Context, deletelink.DeleteLinkCommand) (deletelink.DeleteLinkResult, error)
+}
+
+// UpdateLinkHandler is the update-link command capability exposed to input adapters.
+type UpdateLinkHandler interface {
+	Handle(context.Context, updatelink.UpdateLinkCommand) (updatelink.UpdateLinkResult, error)
 }
 
 // GetLinkHandler is the get-link query capability exposed to input

@@ -1,0 +1,29 @@
+# Air configuration for the single Shorty process.
+root = "."
+tmp_dir = ".air"
+
+[build]
+pre_cmd = ["sqlc generate"]
+cmd = "go build -o ./.air/shorty ./cmd/shorty"
+bin = ".air/shorty"
+entrypoint = ["./.air/shorty"]
+include_dir = ["cmd/shorty", "internal"]
+include_file = ["go.mod", "go.sum", "config.yml", "sqlc.yml"]
+include_ext = ["go", "html", "css", "js", "sql", "yml", "yaml"]
+exclude_dir = [".air", "bin", "vendor", "internal/infra/sqlite/sqlitedb"]
+exclude_regex = ["_test\\.go"]
+exclude_unchanged = true
+delay = 300
+stop_on_error = true
+send_interrupt = true
+kill_delay = 500
+
+[log]
+time = false
+
+[misc]
+clean_on_exit = true
+
+[screen]
+clear_on_rebuild = false
+keep_scroll = true

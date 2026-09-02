@@ -13,7 +13,7 @@ var ErrLinkNotFound = errors.New("link not found")
 
 // LinkSaver persists a newly created link.
 type LinkSaver interface {
-	Save(context.Context, string, domain.Link) error
+	Save(context.Context, domain.Link) error
 }
 
 // LinkFinder retrieves one link by its public code.
@@ -21,14 +21,9 @@ type LinkFinder interface {
 	FindByCode(context.Context, string) (domain.Link, error)
 }
 
-// OwnedLinkFinder retrieves one link only when it belongs to an owner.
-type OwnedLinkFinder interface {
-	FindOwnedByCode(context.Context, string, string) (domain.Link, error)
-}
-
-// LinkLister retrieves newest-first pages of links owned by one caller.
+// LinkLister retrieves newest-first pages of links.
 type LinkLister interface {
-	FindPage(ctx context.Context, ownerID string, limit int, offset int) (LinkPage, error)
+	FindPage(ctx context.Context, limit int, offset int) (LinkPage, error)
 }
 
 // LinkPage contains one creation-ordered slice and the unfiltered total.
@@ -37,28 +32,33 @@ type LinkPage struct {
 	Total int
 }
 
-// LinkVisitsUpdater persists a link whose visit count has changed.
-type LinkVisitsUpdater interface {
-	UpdateLinkVisits(context.Context, domain.Link) error
+// LinkOriginUpdater persists a link whose destination has changed.
+type LinkOriginUpdater interface {
+	UpdateLinkOrigin(context.Context, domain.Link) error
 }
 
-// LinkVisitor groups the capabilities needed to register a visit.
-type LinkVisitor interface {
+// LinkEditor groups the capabilities needed to change a destination.
+type LinkEditor interface {
 	LinkFinder
-	LinkVisitsUpdater
+	LinkOriginUpdater
+}
+
+// LinkResolver atomically registers a visit and returns the resolved link.
+type LinkResolver interface {
+	ResolveByCode(context.Context, string) (domain.Link, error)
 }
 
 // LinkDeleter removes one link by its public code.
 type LinkDeleter interface {
-	Delete(context.Context, string, string) error
+	Delete(context.Context, string) error
 }
 
 // LinkRepository is the complete persistence port used by bootstrap.
 type LinkRepository interface {
 	LinkSaver
 	LinkFinder
-	OwnedLinkFinder
 	LinkLister
-	LinkVisitsUpdater
+	LinkOriginUpdater
+	LinkResolver
 	LinkDeleter
 }

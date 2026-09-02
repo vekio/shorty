@@ -21,9 +21,8 @@ var (
 
 // ListLinksQuery selects one page from the link collection.
 type ListLinksQuery struct {
-	OwnerID string
-	Limit   int
-	Offset  int
+	Limit  int
+	Offset int
 }
 
 // ListLinksResult contains one page and its pagination metadata.

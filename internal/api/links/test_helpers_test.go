@@ -17,6 +17,7 @@ import (
 	"github.com/vekio/shorty/internal/app/getlink"
 	"github.com/vekio/shorty/internal/app/listlinks"
 	"github.com/vekio/shorty/internal/app/resolvelink"
+	"github.com/vekio/shorty/internal/app/updatelink"
 	"github.com/vekio/shorty/internal/infra/memory"
 )
 
@@ -42,6 +43,7 @@ func newTestApplication() app.Application {
 	return app.Application{
 		Commands: app.Commands{
 			CreateLink:  createlink.NewCreateLinkHandler(repository),
+			UpdateLink:  updatelink.NewUpdateLinkHandler(repository),
 			DeleteLink:  deletelink.NewDeleteLinkHandler(repository),
 			ResolveLink: resolvelink.NewResolveLinkHandler(repository),
 		},
@@ -56,12 +58,7 @@ func newTestAPIWithApplication(application app.Application) http.Handler {
 	httpAPI := amigo.New(amigo.WithLogger(testLogger()))
 	apivalidator.Register(httpAPI)
 	Register(httpAPI.Group("/links"), application)
-	return http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		if request.Header.Get("X-Shorty-Owner") == "" {
-			request.Header.Set("X-Shorty-Owner", "browser-a")
-		}
-		httpAPI.ServeHTTP(w, request)
-	})
+	return httpAPI
 }
 
 func testLogger() *slog.Logger {
@@ -69,15 +66,6 @@ func testLogger() *slog.Logger {
 }
 
 func createLink(t *testing.T, httpAPI http.Handler, originURL string) CreateLinkOutput {
-	return createLinkForOwner(t, httpAPI, "browser-a", originURL)
-}
-
-func createLinkForOwner(
-	t *testing.T,
-	httpAPI http.Handler,
-	ownerID string,
-	originURL string,
-) CreateLinkOutput {
 	t.Helper()
 	body, err := json.Marshal(CreateLinkInput{OriginURL: originURL})
 	if err != nil {
@@ -85,7 +73,6 @@ func createLinkForOwner(
 	}
 	request := httptest.NewRequest(http.MethodPost, "/links", bytes.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-Shorty-Owner", ownerID)
 	response := httptest.NewRecorder()
 	httpAPI.ServeHTTP(response, request)
 	if response.Code != http.StatusCreated {

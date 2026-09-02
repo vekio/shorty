@@ -11,6 +11,7 @@ type Application struct {
 // Commands contains the application's state-changing handlers.
 type Commands struct {
 	CreateLink  CreateLinkHandler
+	UpdateLink  UpdateLinkHandler
 	DeleteLink  DeleteLinkHandler
 	ResolveLink ResolveLinkHandler
 }

@@ -16,6 +16,9 @@ var (
 	ErrOriginURLRequired      = errors.New("origin URL is required")
 	ErrOriginURLInvalid       = errors.New("origin URL must be an absolute HTTP or HTTPS URL")
 	ErrOriginURLSelfReference = errors.New("origin URL cannot point to this Shorty instance")
+	ErrLinkCodeRequired       = errors.New("link code is required")
+	ErrLinkCreatedAtRequired  = errors.New("link creation time is required")
+	ErrLinkVisitsInvalid      = errors.New("link visits cannot be negative")
 )
 
 // OriginURLPolicy applies a configurable business rule to a parsed origin URL.
@@ -29,19 +32,34 @@ type Link struct {
 	visits    int
 }
 
-// NewLink creates a Link with a URL-safe, cryptographically random code.
-func NewLink(rawOriginURL string, policies ...OriginURLPolicy) (Link, error) {
+// RestoreLink rebuilds a persisted Link while preserving its identity and state.
+func RestoreLink(code string, rawOriginURL string, createdAt time.Time, visits int) (Link, error) {
+	if code == "" {
+		return Link{}, ErrLinkCodeRequired
+	}
 	originURL, err := parseOriginURL(rawOriginURL)
 	if err != nil {
 		return Link{}, err
 	}
-	for _, policy := range policies {
-		if policy == nil {
-			continue
-		}
-		if err := policy(originURL); err != nil {
-			return Link{}, err
-		}
+	if createdAt.IsZero() {
+		return Link{}, ErrLinkCreatedAtRequired
+	}
+	if visits < 0 {
+		return Link{}, ErrLinkVisitsInvalid
+	}
+	return Link{
+		code:      code,
+		originURL: originURL,
+		createdAt: createdAt.UTC(),
+		visits:    visits,
+	}, nil
+}
+
+// NewLink creates a Link with a URL-safe, cryptographically random code.
+func NewLink(rawOriginURL string, policies ...OriginURLPolicy) (Link, error) {
+	originURL, err := validateOriginURL(rawOriginURL, policies...)
+	if err != nil {
+		return Link{}, err
 	}
 
 	code, err := generateCode()
@@ -73,8 +91,24 @@ func DisallowOriginHost(rawPublicURL string) (OriginURLPolicy, error) {
 
 // ValidateOriginURL checks whether rawOriginURL can be used as a link target.
 func ValidateOriginURL(rawOriginURL string) error {
-	_, err := parseOriginURL(rawOriginURL)
+	_, err := validateOriginURL(rawOriginURL)
 	return err
+}
+
+func validateOriginURL(rawOriginURL string, policies ...OriginURLPolicy) (url.URL, error) {
+	originURL, err := parseOriginURL(rawOriginURL)
+	if err != nil {
+		return url.URL{}, err
+	}
+	for _, policy := range policies {
+		if policy == nil {
+			continue
+		}
+		if err := policy(originURL); err != nil {
+			return url.URL{}, err
+		}
+	}
+	return originURL, nil
 }
 
 func parseOriginURL(rawURL string) (url.URL, error) {
@@ -118,4 +152,15 @@ func (l Link) Visits() int {
 
 func (l *Link) RegisterVisit() {
 	l.visits++
+}
+
+// ChangeOriginURL replaces the destination after applying the same rules used
+// during link creation.
+func (l *Link) ChangeOriginURL(rawOriginURL string, policies ...OriginURLPolicy) error {
+	originURL, err := validateOriginURL(rawOriginURL, policies...)
+	if err != nil {
+		return err
+	}
+	l.originURL = originURL
+	return nil
 }

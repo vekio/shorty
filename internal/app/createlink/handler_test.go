@@ -9,13 +9,11 @@ import (
 )
 
 type repositoryStub struct {
-	ownerID string
 	saved   domain.Link
 	saveErr error
 }
 
-func (repository *repositoryStub) Save(_ context.Context, ownerID string, link domain.Link) error {
-	repository.ownerID = ownerID
+func (repository *repositoryStub) Save(_ context.Context, link domain.Link) error {
 	repository.saved = link
 	return repository.saveErr
 }
@@ -23,7 +21,6 @@ func (repository *repositoryStub) Save(_ context.Context, ownerID string, link d
 func TestHandleCreatesAndSavesLink(t *testing.T) {
 	repository := &repositoryStub{}
 	result, err := NewCreateLinkHandler(repository).Handle(t.Context(), CreateLinkCommand{
-		OwnerID:   "browser-a",
 		OriginURL: "https://example.com/docs",
 	})
 	if err != nil {
@@ -31,9 +28,6 @@ func TestHandleCreatesAndSavesLink(t *testing.T) {
 	}
 	if result.Code == "" || result.Code != repository.saved.Code() {
 		t.Errorf("result code = %q, saved code = %q", result.Code, repository.saved.Code())
-	}
-	if repository.ownerID != "browser-a" {
-		t.Errorf("saved owner = %q, want browser-a", repository.ownerID)
 	}
 	originURL := repository.saved.OriginURL()
 	if got := originURL.String(); got != "https://example.com/docs" {
@@ -60,7 +54,6 @@ func TestHandleAppliesOriginURLPoliciesBeforeSaving(t *testing.T) {
 	}
 
 	_, err = NewCreateLinkHandler(repository, policy).Handle(t.Context(), CreateLinkCommand{
-		OwnerID:   "browser-a",
 		OriginURL: "https://sho.rt/r/existing",
 	})
 

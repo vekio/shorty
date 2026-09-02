@@ -1,7 +1,0 @@
-address: :3000
-short_url: http://localhost:3000
-api_url: http://localhost:8080
-logger:
-  format: text
-  level: info
-  add_source: false

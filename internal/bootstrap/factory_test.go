@@ -31,14 +31,10 @@ func TestNewLoggerUsesConfiguredFormat(t *testing.T) {
 		{format: shortyconfig.LoggerFormatJSON, want: `"msg":"hello"`},
 		{format: shortyconfig.LoggerFormatText, want: "msg=hello"},
 	}
-
 	for _, test := range tests {
 		t.Run(test.format, func(t *testing.T) {
 			var output bytes.Buffer
-			logger, err := newLogger(shortyconfig.LoggerConfig{
-				Format: test.format,
-				Level:  "info",
-			}, &output)
+			logger, err := newLogger(shortyconfig.LoggerConfig{Format: test.format, Level: "info"}, &output)
 			if err != nil {
 				t.Fatalf("newLogger() error = %v", err)
 			}
@@ -50,20 +46,15 @@ func TestNewLoggerUsesConfiguredFormat(t *testing.T) {
 	}
 }
 
-func TestNewLoggerRejectsInvalidLevel(t *testing.T) {
-	if _, err := NewLogger(shortyconfig.LoggerConfig{Level: "verbose"}); err == nil {
-		t.Fatal("NewLogger() returned nil error")
+func TestOpenPersistenceSelectsMemory(t *testing.T) {
+	persistence, err := OpenPersistence(t.Context(), shortyconfig.DatabaseConfig{Driver: shortyconfig.DatabaseDriverMemory})
+	if err != nil {
+		t.Fatalf("OpenPersistence() error = %v", err)
 	}
-}
-
-func TestNewLoggerRejectsInvalidFormat(t *testing.T) {
-	if _, err := NewLogger(shortyconfig.LoggerConfig{Format: "pretty", Level: "info"}); err == nil {
-		t.Fatal("NewLogger() returned nil error")
+	if persistence.WorkspaceName != "default" || !strings.HasPrefix(persistence.WorkspaceID, "ws_") || persistence.Links == nil || persistence.APIKeys == nil {
+		t.Fatalf("OpenPersistence() = %#v", persistence)
 	}
-}
-
-func TestNewLinkRepository(t *testing.T) {
-	if NewLinkRepository() == nil {
-		t.Fatal("NewLinkRepository() returned nil")
+	if err := persistence.Close(); err != nil {
+		t.Errorf("Close() error = %v", err)
 	}
 }

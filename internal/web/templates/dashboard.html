@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shorty</title>
+  <link rel="stylesheet" href="/_/static/app.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Workspace · {{.WorkspaceName}}</p>
+        <h1>Shorty</h1>
+      </div>
+      <p class="subtitle">Links and API keys in one small place.</p>
+    </header>
+
+    {{if .Error}}<p class="notice error">{{.Error}}</p>{{end}}
+    {{if .NewToken}}
+      <section class="notice token">
+        <strong>Copy this API key now. It will not be shown again.</strong>
+        <code id="new-token">{{.NewToken}}</code>
+        <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('new-token').textContent)">Copy</button>
+      </section>
+      <script>history.replaceState(null, "", "/_/");</script>
+    {{end}}
+
+    <section>
+      <h2>Create link</h2>
+      <form method="post" action="/_/links" class="inline-form">
+        <label>Destination URL<input name="origin_url" type="url" placeholder="https://example.com/docs" required></label>
+        <button type="submit">Shorten</button>
+      </form>
+
+      <h2>Links</h2>
+      {{if .Links}}
+        <div class="table-wrap"><table>
+          <thead><tr><th>Code</th><th>Destination</th><th>Visits</th><th></th></tr></thead>
+          <tbody>{{range .Links}}<tr>
+            <td><a href="/r/{{.Code}}" target="_blank" rel="noreferrer">{{.Code}}</a></td>
+            <td class="destination"><a href="{{.OriginURL}}" target="_blank" rel="noreferrer">{{.OriginURL}}</a></td>
+            <td>{{.Visits}}</td>
+            <td><form method="post" action="/_/links/{{.Code}}/delete"><button class="secondary" type="submit">Delete</button></form></td>
+          </tr>{{end}}</tbody>
+        </table></div>
+      {{else}}<p class="empty">No links yet.</p>{{end}}
+    </section>
+
+    <section>
+      <h2>Create API key</h2>
+      <form method="post" action="/_/api-keys" class="inline-form">
+        <label>Name<input name="name" placeholder="CI deployment" required></label>
+        <button type="submit">Create key</button>
+      </form>
+
+      <h2>API keys</h2>
+      {{if .APIKeys}}
+        <div class="table-wrap"><table>
+          <thead><tr><th>Name</th><th>Created</th><th>Last used</th><th>Status</th><th></th></tr></thead>
+          <tbody>{{range .APIKeys}}<tr>
+            <td>{{.Name}}</td>
+            <td>{{.CreatedAt.Format "2006-01-02 15:04"}}</td>
+            <td>{{if .LastUsedAt}}{{.LastUsedAt.Format "2006-01-02 15:04"}}{{else}}Never{{end}}</td>
+            <td>{{if .RevokedAt}}Revoked{{else}}Active{{end}}</td>
+            <td>{{if not .RevokedAt}}<form method="post" action="/_/api-keys/{{.ID}}/revoke"><button class="secondary" type="submit">Revoke</button></form>{{end}}</td>
+          </tr>{{end}}</tbody>
+        </table></div>
+      {{else}}<p class="empty">No API keys yet.</p>{{end}}
+    </section>
+  </main>
+</body>
+</html>
