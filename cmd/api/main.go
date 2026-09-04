@@ -23,9 +23,6 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("load configuration: %w", err)
 	}
-	if len(os.Args) > 1 && os.Args[1] != "serve" {
-		return fmt.Errorf("unknown command %q: expected serve", os.Args[1])
-	}
 	runtime, err := bootstrap.New(cfg)
 	if err != nil {
 		return fmt.Errorf("bootstrap shorty: %w", err)

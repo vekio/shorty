@@ -2,48 +2,33 @@
 package web
 
 import (
+	"bytes"
 	"embed"
-	"html/template"
 	"net/http"
 	"strings"
 
-	"github.com/vekio/shorty/internal/app"
-	"github.com/vekio/shorty/internal/app/createlink"
-	"github.com/vekio/shorty/internal/app/deletelink"
-	"github.com/vekio/shorty/internal/app/listlinks"
+	"github.com/a-h/templ"
 	"github.com/vekio/shorty/internal/auth"
+	"github.com/vekio/shorty/internal/web/components"
+	"github.com/vekio/shorty/internal/web/pages"
 )
 
-//go:embed static templates
+//go:embed static
 var files embed.FS
 
-var dashboardTemplate = template.Must(template.ParseFS(files, "templates/dashboard.html"))
-
 type handler struct {
-	application   app.Application
 	apiKeys       *auth.Service
 	workspaceID   string
 	workspaceName string
 }
 
-type pageData struct {
-	WorkspaceID   string
-	WorkspaceName string
-	Links         []listlinks.LinkResult
-	APIKeys       []auth.APIKey
-	NewToken      string
-	Error         string
-}
-
-// New builds the management Web handler using application use cases directly.
+// New builds the minimal administration handler for API key management.
 func New(
-	application app.Application,
 	apiKeys *auth.Service,
 	workspaceID string,
 	workspaceName string,
 ) http.Handler {
 	handler := &handler{
-		application:   application,
 		apiKeys:       apiKeys,
 		workspaceID:   workspaceID,
 		workspaceName: workspaceName,
@@ -51,100 +36,112 @@ func New(
 	mux := http.NewServeMux()
 	mux.Handle("GET /static/", http.FileServerFS(files))
 	mux.HandleFunc("GET /{$}", handler.dashboard)
-	mux.HandleFunc("POST /links", handler.createLink)
-	mux.HandleFunc("POST /links/{code}/delete", handler.deleteLink)
 	mux.HandleFunc("POST /api-keys", handler.createAPIKey)
 	mux.HandleFunc("POST /api-keys/{id}/revoke", handler.revokeAPIKey)
 	return mux
 }
 
 func (handler *handler) dashboard(w http.ResponseWriter, request *http.Request) {
-	handler.render(w, request, http.StatusOK, "", "")
-}
-
-func (handler *handler) createLink(w http.ResponseWriter, request *http.Request) {
-	if err := request.ParseForm(); err != nil {
-		handler.render(w, request, http.StatusBadRequest, "", "invalid form")
+	data, ok := handler.apiKeyPanelData(w, request, "", "")
+	if !ok {
 		return
 	}
-	_, err := handler.application.Commands.CreateLink.Handle(
-		request.Context(),
-		createlink.CreateLinkCommand{OriginURL: request.FormValue("origin_url")},
-	)
-	if err != nil {
-		handler.render(w, request, http.StatusUnprocessableEntity, "", err.Error())
-		return
-	}
-	http.Redirect(w, request, "/_/", http.StatusSeeOther)
-}
-
-func (handler *handler) deleteLink(w http.ResponseWriter, request *http.Request) {
-	_, err := handler.application.Commands.DeleteLink.Handle(
-		request.Context(),
-		deletelink.DeleteLinkCommand{Code: request.PathValue("code")},
-	)
-	if err != nil {
-		handler.render(w, request, http.StatusUnprocessableEntity, "", err.Error())
-		return
-	}
-	http.Redirect(w, request, "/_/", http.StatusSeeOther)
+	handler.render(w, request, http.StatusOK, false, pages.Dashboard(pages.DashboardData{
+		WorkspaceName: handler.workspaceName,
+		APIKeys:       data,
+	}))
 }
 
 func (handler *handler) createAPIKey(w http.ResponseWriter, request *http.Request) {
 	if err := request.ParseForm(); err != nil {
-		handler.render(w, request, http.StatusBadRequest, "", "invalid form")
+		handler.renderAPIKeyPanel(w, request, http.StatusBadRequest, "", "invalid form")
 		return
 	}
 	_, token, err := handler.apiKeys.Create(
 		request.Context(), handler.workspaceID, request.FormValue("name"),
 	)
 	if err != nil {
-		handler.render(w, request, http.StatusUnprocessableEntity, "", err.Error())
+		handler.renderAPIKeyPanel(w, request, http.StatusUnprocessableEntity, "", err.Error())
 		return
 	}
-	handler.render(w, request, http.StatusCreated, token, "")
+	handler.renderAPIKeyPanel(w, request, http.StatusCreated, token, "")
 }
 
 func (handler *handler) revokeAPIKey(w http.ResponseWriter, request *http.Request) {
 	if err := handler.apiKeys.Revoke(
 		request.Context(), handler.workspaceID, request.PathValue("id"),
 	); err != nil {
-		handler.render(w, request, http.StatusUnprocessableEntity, "", err.Error())
+		handler.renderAPIKeyPanel(w, request, http.StatusUnprocessableEntity, "", err.Error())
 		return
 	}
-	http.Redirect(w, request, "/_/", http.StatusSeeOther)
+	handler.renderAPIKeyPanel(w, request, http.StatusOK, "", "")
 }
 
-func (handler *handler) render(
+func (handler *handler) renderAPIKeyPanel(
 	w http.ResponseWriter,
 	request *http.Request,
 	status int,
 	newToken string,
 	publicError string,
 ) {
-	links, err := handler.application.Queries.ListLinks.Handle(
-		request.Context(), listlinks.ListLinksQuery{Limit: listlinks.MaximumLimit},
-	)
-	if err != nil {
-		http.Error(w, "load links", http.StatusInternalServerError)
+	data, ok := handler.apiKeyPanelData(w, request, newToken, publicError)
+	if !ok {
 		return
 	}
+	if status >= http.StatusBadRequest {
+		// HTMX does not swap error responses by default. The validation message
+		// is part of the successful fragment response instead.
+		status = http.StatusOK
+	}
+	handler.render(w, request, status, newToken != "", components.APIKeyPanel(data))
+}
+
+func (handler *handler) apiKeyPanelData(
+	w http.ResponseWriter,
+	request *http.Request,
+	newToken string,
+	publicError string,
+) (components.APIKeyPanelData, bool) {
 	keys, err := handler.apiKeys.List(request.Context(), handler.workspaceID)
 	if err != nil {
 		http.Error(w, "load API keys", http.StatusInternalServerError)
-		return
+		return components.APIKeyPanelData{}, false
+	}
+	return components.APIKeyPanelData{
+		APIKeys:  keys,
+		NewToken: newToken,
+		Error:    strings.TrimSpace(publicError),
+	}, true
+}
+
+func (handler *handler) render(
+	w http.ResponseWriter,
+	request *http.Request,
+	status int,
+	private bool,
+	component templ.Component,
+) {
+	if err := renderComponent(w, request, status, component, private); err != nil {
+		http.Error(w, "render page", http.StatusInternalServerError)
+	}
+}
+
+func renderComponent(
+	w http.ResponseWriter,
+	request *http.Request,
+	status int,
+	component templ.Component,
+	private bool,
+) error {
+	var content bytes.Buffer
+	if err := component.Render(request.Context(), &content); err != nil {
+		return err
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if newToken != "" {
+	if private {
 		w.Header().Set("Cache-Control", "no-store")
 	}
 	w.WriteHeader(status)
-	_ = dashboardTemplate.Execute(w, pageData{
-		WorkspaceID:   handler.workspaceID,
-		WorkspaceName: handler.workspaceName,
-		Links:         links.Links,
-		APIKeys:       keys,
-		NewToken:      newToken,
-		Error:         strings.TrimSpace(publicError),
-	})
+	_, err := content.WriteTo(w)
+	return err
 }

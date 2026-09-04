@@ -38,7 +38,7 @@ func TestLoadFromConfiguredFile(t *testing.T) {
 	if err := os.WriteFile(path, contents, 0o600); err != nil {
 		t.Fatalf("write configuration: %v", err)
 	}
-	t.Setenv(configFileEnv, path)
+	t.Setenv("SHORTY_CONFIG_FILE", path)
 
 	config, err := Load()
 	if err != nil {

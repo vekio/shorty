@@ -6,6 +6,6 @@ variables:
   - name: link_code
     value: ""
     description: Set automatically by Create Link
-  - name: api_key
-    value: ""
-    description: Create from the admin panel at /_/
+  - secret: true
+    name: api_key
+    description: Authentication header value

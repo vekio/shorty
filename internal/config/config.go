@@ -8,10 +8,7 @@ import (
 	vekconfig "github.com/vekio/config"
 )
 
-const (
-	configFileName = "config.yml"
-	configFileEnv  = "SHORTY_CONFIG_FILE"
-)
+const configFileName = "config.yml"
 
 // DatabaseDriver identifies a persistence adapter available to Shorty.
 type DatabaseDriver string
@@ -41,7 +38,7 @@ func Default() Config {
 		Address:  ":8080",
 		ShortURL: "http://localhost:8080",
 		Logger:   DefaultLoggerConfig(),
-		Database: DatabaseConfig{Driver: DatabaseDriverSQLite, Path: "shorty.db"},
+		Database: DatabaseConfig{Driver: DatabaseDriverSQLite, Path: "data/shorty.db"},
 	}
 }
 
@@ -81,9 +78,6 @@ func (cfg DatabaseConfig) Validate() error {
 func Load() (Config, error) {
 	file, err := New[Config](configFileName)
 	if err != nil {
-		return Config{}, err
-	}
-	if err := SetPathFromEnv(file, configFileEnv); err != nil {
 		return Config{}, err
 	}
 	return file.LoadOrCreate(Default())

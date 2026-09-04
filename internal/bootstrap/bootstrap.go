@@ -97,7 +97,6 @@ func newHTTPHandler(application app.Application, deps dependencies) http.Handler
 		redirect.New(application, deps.logger),
 		managementAPI,
 		web.New(
-			application,
 			deps.auth,
 			deps.persistence.WorkspaceID,
 			deps.persistence.WorkspaceName,

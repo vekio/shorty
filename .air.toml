@@ -1,17 +1,18 @@
-# Air configuration for the single Shorty process.
+# Air configuration for the Shorty API server.
 root = "."
 tmp_dir = ".air"
 
 [build]
-pre_cmd = ["sqlc generate"]
-cmd = "go build -o ./.air/shorty ./cmd/shorty"
-bin = ".air/shorty"
-entrypoint = ["./.air/shorty"]
-include_dir = ["cmd/shorty", "internal"]
-include_file = ["go.mod", "go.sum", "config.yml", "sqlc.yml"]
-include_ext = ["go", "html", "css", "js", "sql", "yml", "yaml"]
+pre_cmd = ["sqlc generate", "go tool templ generate", "pnpm exec tailwindcss -i internal/web/styles/global.css -o internal/web/static/css/style.css --minify", "cp node_modules/htmx.org/dist/htmx.min.js internal/web/static/js/htmx.min.js"]
+cmd = "go build -o ./.air/shorty-api ./cmd/api"
+bin = ".air/shorty-api"
+entrypoint = ["./.air/shorty-api"]
+include_dir = ["cmd/api", "internal"]
+include_file = ["go.mod", "go.sum", "package.json", "pnpm-lock.yaml", "config.yml", "sqlc.yml"]
+include_ext = ["go", "templ", "css", "js", "json", "sql", "yml", "yaml"]
 exclude_dir = [".air", "bin", "vendor", "internal/infra/sqlite/sqlitedb"]
-exclude_regex = ["_test\\.go"]
+exclude_file = ["internal/web/static/css/style.css"]
+exclude_regex = ["_test\\.go", "_templ\\.go"]
 exclude_unchanged = true
 delay = 300
 stop_on_error = true

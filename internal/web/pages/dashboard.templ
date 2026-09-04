@@ -1,0 +1,19 @@
+package pages
+
+import (
+	"github.com/vekio/shorty/internal/web/components"
+	"github.com/vekio/shorty/internal/web/layouts"
+)
+
+templ Dashboard(data DashboardData) {
+	@layouts.Base("Shorty administration") {
+		<main class="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+			<header class="mb-8 border-b border-zinc-300 pb-5">
+				<p class="text-xs font-semibold uppercase tracking-widest text-zinc-500">{ data.WorkspaceName } workspace</p>
+				<h1 class="mt-1 text-3xl font-bold tracking-tight">API tokens</h1>
+				<p class="mt-2 text-sm text-zinc-600">Create credentials for the Shorty API and automation clients.</p>
+			</header>
+			@components.APIKeyPanel(data.APIKeys)
+		</main>
+	}
+}

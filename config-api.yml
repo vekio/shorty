@@ -1,9 +1,9 @@
 address: :8080
 short_url: http://localhost:8080
 logger:
-  format: text
+  format: json
   level: info
   add_source: false
 database:
   driver: sqlite
-  path: shorty.db
+  path: data/shorty.db

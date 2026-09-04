@@ -30,10 +30,10 @@ func TestNewComposesSingleProcessWithSharedApplication(t *testing.T) {
 		t.Fatalf("runtime = %#v, want complete process", runtime)
 	}
 
-	webResponse := httptest.NewRecorder()
-	runtime.Handler.ServeHTTP(webResponse, httptest.NewRequest(http.MethodGet, "/_/", nil))
-	if webResponse.Code != http.StatusOK || !strings.Contains(webResponse.Body.String(), "Shorty") {
-		t.Fatalf("web response = %d %s", webResponse.Code, webResponse.Body.String())
+	adminResponse := httptest.NewRecorder()
+	runtime.Handler.ServeHTTP(adminResponse, httptest.NewRequest(http.MethodGet, "/_/", nil))
+	if adminResponse.Code != http.StatusOK || !strings.Contains(adminResponse.Body.String(), "Shorty") {
+		t.Fatalf("admin response = %d %s", adminResponse.Code, adminResponse.Body.String())
 	}
 
 	createRequest := httptest.NewRequest(
@@ -89,7 +89,7 @@ func TestNewProtectsManagementAPI(t *testing.T) {
 	}
 }
 
-func TestWebCreatedAPIKeyAuthenticatesManagementAPI(t *testing.T) {
+func TestAdminCreatedAPIKeyAuthenticatesManagementAPI(t *testing.T) {
 	config := shortyconfig.Default()
 	config.Database = shortyconfig.DatabaseConfig{Driver: shortyconfig.DatabaseDriverMemory}
 	runtime, err := New(config)
@@ -110,7 +110,7 @@ func TestWebCreatedAPIKeyAuthenticatesManagementAPI(t *testing.T) {
 		t.Fatalf("create key status = %d; body = %s", createKeyResponse.Code, createKeyResponse.Body.String())
 	}
 
-	match := regexp.MustCompile(`<code id="new-token">([^<]+)</code>`).FindStringSubmatch(createKeyResponse.Body.String())
+	match := regexp.MustCompile(`<code id="new-token"[^>]*>([^<]+)</code>`).FindStringSubmatch(createKeyResponse.Body.String())
 	if len(match) != 2 {
 		t.Fatalf("created token not found in response: %s", createKeyResponse.Body.String())
 	}
